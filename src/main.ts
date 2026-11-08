@@ -120,7 +120,7 @@ export default class DBUIPlugin extends Plugin {
     this.addCommand({
       id: "focus-dbui-search",
       name: "Search active database table",
-      hotkeys: [{ modifiers: ["Mod"], key: "k" }],
+      hotkeys: [{ modifiers: [], key: "/" }],
       checkCallback: (checking: boolean) => {
         const activeLeaf = this.app.workspace.activeLeaf;
         if (activeLeaf && activeLeaf.view) {

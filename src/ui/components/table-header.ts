@@ -34,7 +34,6 @@ export class TableHeader {
       const colWidth = column.width || 160;
       th.style.width = `${colWidth}px`;
       th.style.minWidth = `${colWidth}px`;
-      th.style.maxWidth = `${colWidth}px`;
       th.setAttribute("data-key", column.key);
       th.setAttribute("draggable", "true");
 
@@ -213,7 +212,6 @@ export class TableHeader {
         newWidth = Math.max(60, startWidth + delta);
         th.style.width = `${newWidth}px`;
         th.style.minWidth = `${newWidth}px`;
-        th.style.maxWidth = `${newWidth}px`;
       };
 
       const onMouseUp = async () => {

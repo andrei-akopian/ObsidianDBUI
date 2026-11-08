@@ -73,9 +73,17 @@ export class DBTableView {
     this.emptyContainerEl = this.tableContainerEl.createDiv({ cls: "dbui-empty-container" });
     this.emptyContainerEl.style.display = "none";
 
-    // Global Cmd/Ctrl + K shortcut inside table view
+    // Global '/' shortcut inside table view (focuses and selects search box)
     this.rootEl.addEventListener("keydown", (evt: KeyboardEvent) => {
-      if ((evt.metaKey || evt.ctrlKey) && evt.key.toLowerCase() === "k") {
+      const target = evt.target as HTMLElement;
+      const isInput =
+        target &&
+        (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable);
+      if (!isInput && evt.key === "/" && !evt.metaKey && !evt.ctrlKey && !evt.altKey) {
+        evt.preventDefault();
+        evt.stopPropagation();
+        TableToolbar.focusSearch(this.toolbarEl);
+      } else if ((evt.metaKey || evt.ctrlKey) && evt.key.toLowerCase() === "k") {
         evt.preventDefault();
         evt.stopPropagation();
         TableToolbar.focusSearch(this.toolbarEl);
@@ -128,6 +136,17 @@ export class DBTableView {
     await this.refreshData(true);
   }
 
+  private filterAndSortRows(searchQuery = this.quickSearch): void {
+    this.processedRows = FilterSorter.process(
+      this.rawRows,
+      this.config.filters,
+      this.config.sort,
+      searchQuery,
+      this.config.columns,
+      this.config
+    );
+  }
+
   async refreshData(discoverCols = false): Promise<void> {
     // 1. Scan notes in folder
     const notes = this.vaultScanner.getNotesInFolder(
@@ -151,13 +170,8 @@ export class DBTableView {
     // 4. Collect tags
     this.allVaultTags = this.vaultScanner.getAllVaultTags(this.rawRows);
 
-    // 5. Filter and sort
-    this.processedRows = FilterSorter.process(
-      this.rawRows,
-      this.config.filters,
-      this.config.sort,
-      this.quickSearch
-    );
+    // 5. Datatype-aware filter and sort
+    this.filterAndSortRows();
 
     // 6. Render
     this.render();
@@ -167,6 +181,7 @@ export class DBTableView {
     // Apply density & wrap classes
     this.rootEl.toggleClass("is-compact", this.config.settings.rowDensity === "compact");
     this.rootEl.toggleClass("is-wrap-cells", Boolean(this.config.settings.wrapCells));
+    this.rootEl.toggleClass("is-search-active", Boolean(this.quickSearch && this.quickSearch.trim()));
 
     // Render Toolbar
     TableToolbar.render(
@@ -176,12 +191,7 @@ export class DBTableView {
       this.discoveredProps,
       (query) => {
         this.quickSearch = query;
-        this.processedRows = FilterSorter.process(
-          this.rawRows,
-          this.config.filters,
-          this.config.sort,
-          this.quickSearch
-        );
+        this.filterAndSortRows();
         this.renderBody();
       },
       async (newFolder) => {
@@ -197,12 +207,7 @@ export class DBTableView {
         TableToolbar.updateBadges(this.toolbarEl, this.config);
       },
       () => {
-        this.processedRows = FilterSorter.process(
-          this.rawRows,
-          this.config.filters,
-          this.config.sort,
-          this.quickSearch
-        );
+        this.filterAndSortRows();
         this.renderHeaderAndBody();
         TableToolbar.updateBadges(this.toolbarEl, this.config);
       }
@@ -226,12 +231,7 @@ export class DBTableView {
         TableToolbar.updateBadges(this.toolbarEl, this.config);
       },
       () => {
-        this.processedRows = FilterSorter.process(
-          this.rawRows,
-          this.config.filters,
-          this.config.sort,
-          this.quickSearch
-        );
+        this.filterAndSortRows();
         this.renderBody();
       }
     );
@@ -241,6 +241,7 @@ export class DBTableView {
 
   private renderBody(): void {
     const visibleColumns = this.config.columns.filter((c) => c.visible !== false);
+    this.rootEl.toggleClass("is-search-active", Boolean(this.quickSearch && this.quickSearch.trim()));
 
     if (this.processedRows.length === 0) {
       this.tbodyEl.empty();
@@ -248,6 +249,7 @@ export class DBTableView {
       this.emptyContainerEl.empty();
 
       if (this.quickSearch && this.quickSearch.trim()) {
+        this.emptyContainerEl.className = "dbui-empty-container is-search-empty";
         this.emptyContainerEl.createDiv({
           cls: "dbui-empty-title",
           text: `No notes matching "${this.quickSearch.trim()}".`,
@@ -260,16 +262,16 @@ export class DBTableView {
         clearBtn.addEventListener("click", () => {
           this.quickSearch = "";
           const searchInput = this.toolbarEl.querySelector(".dbui-search-input") as HTMLInputElement;
-          if (searchInput) searchInput.value = "";
-          this.processedRows = FilterSorter.process(
-            this.rawRows,
-            this.config.filters,
-            this.config.sort,
-            ""
-          );
-          this.renderBody();
+          if (searchInput) {
+            searchInput.value = "";
+            const clearIcon = this.toolbarEl.querySelector(".dbui-search-clear") as HTMLElement;
+            if (clearIcon) clearIcon.style.display = "none";
+          }
+          this.filterAndSortRows("");
+          this.render();
         });
       } else if (this.config.filters && this.config.filters.length > 0) {
+        this.emptyContainerEl.className = "dbui-empty-container";
         this.emptyContainerEl.createDiv({
           cls: "dbui-empty-title",
           text: "No notes match active filters.",
@@ -282,16 +284,12 @@ export class DBTableView {
         clearBtn.addEventListener("click", async () => {
           this.config.filters = [];
           await this.saveConfig();
-          this.processedRows = FilterSorter.process(
-            this.rawRows,
-            this.config.filters,
-            this.config.sort,
-            this.quickSearch
-          );
+          this.filterAndSortRows();
           this.renderHeaderAndBody();
           TableToolbar.updateBadges(this.toolbarEl, this.config);
         });
       } else {
+        this.emptyContainerEl.className = "dbui-empty-container";
         this.emptyContainerEl.createDiv({
           cls: "dbui-empty-title",
           text: this.config.folder
@@ -311,6 +309,7 @@ export class DBTableView {
     }
 
     // When rows exist, hide empty container and render table body
+    this.emptyContainerEl.className = "dbui-empty-container";
     this.emptyContainerEl.style.display = "none";
 
     TableBody.render(

@@ -6,7 +6,7 @@ This is a plugin for giving obsidian "bases" (databases) a good UI, similar to n
 >
 > Code is LLM written. The author has used it for less than \*\*1\*\* days. His use case is managing his ~1000 book reading list. Functionality outside this range might be poor.
 
-
+---
 
 The goal of this project is to create an obsidian base view with extremely good UI.
 
@@ -28,3 +28,9 @@ Desired featureset:
 - minimalist. Keep margins and padding in UI to minimum
 - standard featuers such as dragging and resizing columns on UI, editing column names, editing the original file by clicking on a cell and editing the property, etc. etc. filtering, sorting, selecting which columns to display and in which format, etc.
 - not sure how to store the configuration options
+
+## TODO
+
+- \[ \] Remove accent border form search results
+- \[ \] add accent border on the sticky property column
+- \[ \] make "New Note" full row width

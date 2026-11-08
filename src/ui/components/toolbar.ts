@@ -9,7 +9,15 @@ import { SortPopover } from "./sort-popover";
 export class TableToolbar {
   private static searchInputEl: HTMLInputElement | null = null;
 
-  static focusSearch(): void {
+  static focusSearch(container?: HTMLElement): void {
+    if (container) {
+      const input = container.querySelector(".dbui-search-input") as HTMLInputElement;
+      if (input) {
+        input.focus();
+        input.select();
+        return;
+      }
+    }
     if (this.searchInputEl && this.searchInputEl.isConnected) {
       this.searchInputEl.focus();
       this.searchInputEl.select();
@@ -50,22 +58,54 @@ export class TableToolbar {
       }).open();
     });
 
-    // 2. Search Input (moved to left side, wider, with ⌘K shortcut hint)
+    // 2. Search Input (with '/' shortcut hint, highlight-on-click, and 'x' clear button)
     const searchWrap = leftGroup.createDiv({ cls: "dbui-search-wrap dbui-search-left" });
     const searchIcon = searchWrap.createSpan({ cls: "dbui-search-icon" });
     setIcon(searchIcon, "search");
-    const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
-    const hotkeyHint = isMac ? "⌘K" : "Ctrl+K";
 
     const searchInput = searchWrap.createEl("input", {
       type: "text",
       cls: "dbui-search-input",
-      placeholder: `Search... (${hotkeyHint})`,
+      placeholder: "Search... (/)",
     });
     this.searchInputEl = searchInput;
 
+    const clearBtn = searchWrap.createSpan({ cls: "dbui-search-clear" });
+    setIcon(clearBtn, "x");
+    clearBtn.style.display = "none";
+    clearBtn.setAttribute("title", "Clear search");
+
+    const updateClearBtn = () => {
+      const hasVal = Boolean(searchInput.value && searchInput.value.length > 0);
+      clearBtn.style.display = hasVal ? "flex" : "none";
+      searchWrap.toggleClass("has-query", hasVal);
+    };
+
+    clearBtn.addEventListener("click", (evt) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      searchInput.value = "";
+      updateClearBtn();
+      onSearch("");
+      searchInput.focus();
+    });
+
     searchInput.addEventListener("input", () => {
+      updateClearBtn();
       onSearch(searchInput.value);
+    });
+
+    // Highlight existing text on click and focus
+    searchInput.addEventListener("click", () => {
+      if (searchInput.value) {
+        searchInput.select();
+      }
+    });
+
+    searchInput.addEventListener("focus", () => {
+      if (searchInput.value) {
+        searchInput.select();
+      }
     });
 
     // 3. Filter button with badge

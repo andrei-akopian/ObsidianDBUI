@@ -1,4 +1,4 @@
-import { ColumnConfig, DataType, DBConfig, SortDirection, SortRule } from "../../types";
+import { ColumnConfig, DataType, DBConfig, SortDirection, SortRule, StatusOption } from "../../types";
 import { PopoverManager } from "../popover-manager";
 
 export class SortPopover {
@@ -34,7 +34,7 @@ export class SortPopover {
 
     const listContainer = popover.createDiv({ cls: "dbui-sort-list" });
 
-    const getDirectionLabels = (type: DataType) => {
+    const getDirectionLabels = (type: DataType, options?: StatusOption[]) => {
       switch (type) {
         case "number":
           return { asc: "0 → 9 (Smallest first)", desc: "9 → 0 (Largest first)" };
@@ -43,11 +43,22 @@ export class SortPopover {
           return { asc: "Oldest first (Ascending)", desc: "Newest first (Descending)" };
         case "checkbox":
           return { asc: "Unchecked first", desc: "Checked first" };
-        case "text":
-        case "file":
-        case "status":
+        case "status": {
+          const firstOpt = options?.[0]?.label;
+          const lastOpt = options?.[options.length - 1]?.label;
+          if (firstOpt && lastOpt && firstOpt !== lastOpt) {
+            return {
+              asc: `${firstOpt} → ${lastOpt} (Status order)`,
+              desc: `${lastOpt} → ${firstOpt} (Reverse order)`,
+            };
+          }
+          return { asc: "Status order (Ascending)", desc: "Reverse status order (Descending)" };
+        }
         case "tag":
         case "multi-tag":
+          return { asc: "A → Z (Ascending)", desc: "Z → A (Descending)" };
+        case "text":
+        case "file":
         default:
           return { asc: "A → Z (Ascending)", desc: "Z → A (Descending)" };
       }
@@ -88,7 +99,10 @@ export class SortPopover {
 
         // 2. Datatype-aware direction select
         const dirSelect = row.createEl("select", { cls: "dbui-select dbui-sort-dir-select" });
-        const labels = getDirectionLabels(currentCol.type);
+        const labels = getDirectionLabels(
+          currentCol.type,
+          (config.statusOptions && config.statusOptions[currentCol.key]) || currentCol.options
+        );
 
         const dirOptAsc = dirSelect.createEl("option", { value: "asc", text: labels.asc });
         const dirOptDesc = dirSelect.createEl("option", { value: "desc", text: labels.desc });

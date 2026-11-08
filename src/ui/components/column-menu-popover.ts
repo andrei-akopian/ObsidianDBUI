@@ -1,6 +1,6 @@
 import { App, Notice } from "obsidian";
 import { FrontmatterManager } from "../../data/frontmatter-manager";
-import { ColumnConfig, DataType, DateFormat, DBConfig, NumberFormat, RowData } from "../../types";
+import { ColumnConfig, DataType, DateFormat, DBConfig, NumberFormat, RowData, StatusOption } from "../../types";
 import { PopoverManager } from "../popover-manager";
 import { checkTypeCompatibility, TypeWarningModal } from "./type-warning-modal";
 
@@ -206,9 +206,43 @@ export class ColumnMenuPopover {
       toggleWrap();
     });
 
-    // Sort items
+    // Datatype-aware sort items
+    const getSortMenuLabels = (type: DataType, options?: StatusOption[]) => {
+      switch (type) {
+        case "number":
+          return { asc: "Sort 0 → 9 (Smallest first)", desc: "Sort 9 → 0 (Largest first)" };
+        case "date":
+        case "time":
+          return { asc: "Sort oldest first", desc: "Sort newest first" };
+        case "checkbox":
+          return { asc: "Sort unchecked first", desc: "Sort checked first" };
+        case "status": {
+          const firstOpt = options?.[0]?.label;
+          const lastOpt = options?.[options.length - 1]?.label;
+          if (firstOpt && lastOpt && firstOpt !== lastOpt) {
+            return {
+              asc: `Sort ${firstOpt} → ${lastOpt}`,
+              desc: `Sort ${lastOpt} → ${firstOpt}`,
+            };
+          }
+          return { asc: "Sort by status order", desc: "Sort reverse status order" };
+        }
+        case "tag":
+        case "multi-tag":
+        case "text":
+        case "file":
+        default:
+          return { asc: "Sort A → Z (Ascending)", desc: "Sort Z → A (Descending)" };
+      }
+    };
+
+    const sortLabels = getSortMenuLabels(
+      column.type,
+      (config.statusOptions && config.statusOptions[column.key]) || column.options
+    );
+
     const sortAscItem = popover.createDiv({ cls: "dbui-menu-action-item" });
-    sortAscItem.createSpan({ text: "Sort ascending ▲" });
+    sortAscItem.createSpan({ text: `${sortLabels.asc} ▲` });
     sortAscItem.addEventListener("click", async () => {
       config.sort = [{ key: column.key, direction: "asc" }];
       await onConfigChange();
@@ -217,7 +251,7 @@ export class ColumnMenuPopover {
     });
 
     const sortDescItem = popover.createDiv({ cls: "dbui-menu-action-item" });
-    sortDescItem.createSpan({ text: "Sort descending ▼" });
+    sortDescItem.createSpan({ text: `${sortLabels.desc} ▼` });
     sortDescItem.addEventListener("click", async () => {
       config.sort = [{ key: column.key, direction: "desc" }];
       await onConfigChange();

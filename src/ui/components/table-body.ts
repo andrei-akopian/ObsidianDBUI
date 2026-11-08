@@ -48,13 +48,12 @@ export class TableBody {
         }
       });
 
-      // Data Cells with strict min-width and max-width to keep wide tables structured
+      // Data Cells with minimum and ideal width
       columns.forEach((column) => {
         const td = tr.createEl("td", { cls: "dbui-td" });
         const colWidth = column.width || 160;
         td.style.width = `${colWidth}px`;
         td.style.minWidth = `${colWidth}px`;
-        td.style.maxWidth = `${colWidth}px`;
 
         CellRenderer.renderCell(
           td,

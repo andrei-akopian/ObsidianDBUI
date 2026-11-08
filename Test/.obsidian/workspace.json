@@ -81,7 +81,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 274.7265625
   },
   "right": {
     "id": "d53dd9b0fc0f18de",
@@ -187,11 +187,12 @@
   },
   "active": "434c0c0d940ec46a",
   "lastOpenFiles": [
-    "Database.dbui",
+    "ReadingList/Untitled 2.md",
+    "ReadingList Embed Demo.md",
     "ReadingList.dbui",
+    "Database.dbui",
     "ReadingList/Untitled 1.md",
     "ReadingList/Untitled.md",
-    "ReadingList Embed Demo.md",
     "Untitled 1.base",
     "ReadingList/The Hobbit.md",
     "ReadingList/Example Book.md",

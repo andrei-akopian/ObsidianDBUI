@@ -1,15 +1,17 @@
-import { FilterRule, RowData, SortRule } from "../types";
+import { ColumnConfig, DataType, DBConfig, FilterRule, RowData, SortRule, StatusOption } from "../types";
 import { isDateInFuture, isDateInPast, isDateToday, parseDate } from "../utils/date-utils";
 
 export class FilterSorter {
   /**
-   * Filter and sort rows based on config rules and quick search query.
+   * Filter and sort rows based on config rules, column types, and quick search query.
    */
   static process(
     rows: RowData[],
     filters: FilterRule[],
     sorts: SortRule[],
-    quickSearch = ""
+    quickSearch = "",
+    columns: ColumnConfig[] = [],
+    config?: DBConfig
   ): RowData[] {
     let result = [...rows];
 
@@ -41,13 +43,18 @@ export class FilterSorter {
       });
     }
 
-    // 3. Sorting
+    // 3. Datatype-Aware Sorting
     if (sorts && sorts.length > 0) {
       result.sort((a, b) => {
         for (const sort of sorts) {
+          const col = columns.find((c) => c.key === sort.key);
+          const colType = col ? col.type : "text";
+          const statusOptions =
+            (config?.statusOptions && config.statusOptions[sort.key]) || col?.options;
+
           const valA = a.values[sort.key];
           const valB = b.values[sort.key];
-          const cmp = this.compareValues(valA, valB);
+          const cmp = this.compareValues(valA, valB, colType, statusOptions);
           if (cmp !== 0) {
             return sort.direction === "asc" ? cmp : -cmp;
           }
@@ -161,34 +168,92 @@ export class FilterSorter {
     return true;
   }
 
-  private static compareValues(valA: any, valB: any): number {
+  private static compareValues(
+    valA: any,
+    valB: any,
+    colType: DataType = "text",
+    statusOptions?: StatusOption[]
+  ): number {
+    // 1. Checkbox / Boolean sorting (Checked vs Unchecked)
+    if (colType === "checkbox") {
+      const boolA = valA === true || String(valA).toLowerCase() === "true" || valA === 1;
+      const boolB = valB === true || String(valB).toLowerCase() === "true" || valB === 1;
+      if (boolA !== boolB) {
+        return boolA ? 1 : -1;
+      }
+      return 0;
+    }
+
+    // Null checks for all non-boolean values (empty values always sort to bottom)
     const isNullA = valA === null || valA === undefined || valA === "";
     const isNullB = valB === null || valB === undefined || valB === "";
 
     if (isNullA && isNullB) return 0;
-    if (isNullA) return 1; // nulls at bottom
+    if (isNullA) return 1;
     if (isNullB) return -1;
 
-    // Date comparison
+    // 2. Status pipeline order sorting
+    if (colType === "status") {
+      if (statusOptions && statusOptions.length > 0) {
+        const strA = String(valA).trim().toLowerCase();
+        const strB = String(valB).trim().toLowerCase();
+        const idxA = statusOptions.findIndex((o) => o.label.toLowerCase() === strA);
+        const idxB = statusOptions.findIndex((o) => o.label.toLowerCase() === strB);
+
+        if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+        if (idxA !== -1) return -1;
+        if (idxB !== -1) return 1;
+      }
+      return String(valA).localeCompare(String(valB), undefined, {
+        numeric: true,
+        sensitivity: "base",
+      });
+    }
+
+    // 3. Number sorting (handles numbers, floats, currency strings)
+    if (colType === "number") {
+      const numA = typeof valA === "number" ? valA : parseFloat(String(valA).replace(/[^0-9.-]/g, ""));
+      const numB = typeof valB === "number" ? valB : parseFloat(String(valB).replace(/[^0-9.-]/g, ""));
+      if (!isNaN(numA) && !isNaN(numB)) {
+        return numA - numB;
+      }
+      if (!isNaN(numA)) return -1;
+      if (!isNaN(numB)) return 1;
+      return String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    // 4. Date / Time sorting (chronological)
+    if (colType === "date" || colType === "time") {
+      const dateA = parseDate(valA);
+      const dateB = parseDate(valB);
+      if (dateA && dateB) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      if (dateA) return -1;
+      if (dateB) return 1;
+      return String(valA).localeCompare(String(valB), undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    // 5. Tag / Multi-tag sorting
+    if (colType === "tag" || colType === "multi-tag") {
+      const strA = Array.isArray(valA) ? valA.join(", ") : String(valA);
+      const strB = Array.isArray(valB) ? valB.join(", ") : String(valB);
+      return strA.localeCompare(strB, undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    // 6. Text / File / General natural alphanumeric sort
     const dateA = parseDate(valA);
     const dateB = parseDate(valB);
-    if (dateA && dateB) {
+    if (dateA && dateB && String(valA).includes("-") && String(valB).includes("-")) {
       return dateA.getTime() - dateB.getTime();
     }
 
-    // Number comparison
     const numA = Number(valA);
     const numB = Number(valB);
     if (!isNaN(numA) && !isNaN(numB) && typeof valA !== "boolean" && typeof valB !== "boolean") {
       return numA - numB;
     }
 
-    // Boolean comparison
-    if (typeof valA === "boolean" && typeof valB === "boolean") {
-      return valA === valB ? 0 : valA ? 1 : -1;
-    }
-
-    // String natural comparison
     const strA = String(Array.isArray(valA) ? valA.join(", ") : valA);
     const strB = String(Array.isArray(valB) ? valB.join(", ") : valB);
     return strA.localeCompare(strB, undefined, { numeric: true, sensitivity: "base" });
