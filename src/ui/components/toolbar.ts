@@ -7,6 +7,15 @@ import { FolderSuggestModal } from "./folder-suggest-modal";
 import { SortPopover } from "./sort-popover";
 
 export class TableToolbar {
+  private static searchInputEl: HTMLInputElement | null = null;
+
+  static focusSearch(): void {
+    if (this.searchInputEl && this.searchInputEl.isConnected) {
+      this.searchInputEl.focus();
+      this.searchInputEl.select();
+    }
+  }
+
   static render(
     container: HTMLElement,
     app: App,
@@ -24,11 +33,11 @@ export class TableToolbar {
     // Left toolbar section
     const leftGroup = container.createDiv({ cls: "dbui-toolbar-group dbui-toolbar-left" });
 
-    // Source Folder Selector Dropdown Button
+    // 1. Source Folder Selector Dropdown Button
     const folderBtn = leftGroup.createDiv({ cls: "dbui-toolbar-btn dbui-folder-btn" });
     const folderIcon = folderBtn.createSpan({ cls: "dbui-btn-icon" });
     setIcon(folderIcon, "folder");
-    const folderLabel = folderBtn.createSpan({
+    folderBtn.createSpan({
       cls: "dbui-btn-label",
       text: config.folder ? config.folder : "/ (Root)",
     });
@@ -41,7 +50,25 @@ export class TableToolbar {
       }).open();
     });
 
-    // Filter button with badge
+    // 2. Search Input (moved to left side, wider, with ⌘K shortcut hint)
+    const searchWrap = leftGroup.createDiv({ cls: "dbui-search-wrap dbui-search-left" });
+    const searchIcon = searchWrap.createSpan({ cls: "dbui-search-icon" });
+    setIcon(searchIcon, "search");
+    const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
+    const hotkeyHint = isMac ? "⌘K" : "Ctrl+K";
+
+    const searchInput = searchWrap.createEl("input", {
+      type: "text",
+      cls: "dbui-search-input",
+      placeholder: `Search... (${hotkeyHint})`,
+    });
+    this.searchInputEl = searchInput;
+
+    searchInput.addEventListener("input", () => {
+      onSearch(searchInput.value);
+    });
+
+    // 3. Filter button with badge
     const filterBtn = leftGroup.createDiv({
       cls: `dbui-toolbar-btn dbui-filter-btn ${config.filters.length > 0 ? "is-active" : ""}`,
     });
@@ -61,7 +88,7 @@ export class TableToolbar {
       );
     });
 
-    // Sort button with badge
+    // 4. Sort button with badge
     const sortBtn = leftGroup.createDiv({
       cls: `dbui-toolbar-btn dbui-sort-btn ${config.sort.length > 0 ? "is-active" : ""}`,
     });
@@ -81,7 +108,7 @@ export class TableToolbar {
       );
     });
 
-    // Properties button
+    // 5. Properties button
     const propsBtn = leftGroup.createDiv({ cls: "dbui-toolbar-btn dbui-props-btn" });
     const propsIcon = propsBtn.createSpan({ cls: "dbui-btn-icon" });
     setIcon(propsIcon, "sliders-horizontal");
@@ -90,50 +117,8 @@ export class TableToolbar {
       ColumnsPopover.open(propsBtn, config, discoveredProps, onConfigChange, onDataUpdated);
     });
 
-    // Right toolbar section
+    // Right toolbar section (clean: only the primary "+ New" button)
     const rightGroup = container.createDiv({ cls: "dbui-toolbar-group dbui-toolbar-right" });
-
-    // Quick search input
-    const searchWrap = rightGroup.createDiv({ cls: "dbui-search-wrap" });
-    const searchIcon = searchWrap.createSpan({ cls: "dbui-search-icon" });
-    setIcon(searchIcon, "search");
-    const searchInput = searchWrap.createEl("input", {
-      type: "text",
-      cls: "dbui-search-input",
-      placeholder: "Search...",
-    });
-    searchInput.addEventListener("input", () => {
-      onSearch(searchInput.value);
-    });
-
-    // Wordwrap toggle button
-    const wrapBtn = rightGroup.createDiv({
-      cls: `dbui-toolbar-btn dbui-wrap-btn dbui-icon-only-btn ${config.settings.wrapCells ? "is-active" : ""}`,
-    });
-    wrapBtn.setAttribute("title", config.settings.wrapCells ? "Disable wrap" : "Enable wrap");
-    const wrapIcon = wrapBtn.createSpan({ cls: "dbui-btn-icon" });
-    setIcon(wrapIcon, "wrap-text");
-    wrapBtn.addEventListener("click", async () => {
-      config.settings.wrapCells = !config.settings.wrapCells;
-      await onConfigChange();
-      onDataUpdated();
-    });
-
-    // Row density toggle
-    const densityBtn = rightGroup.createDiv({
-      cls: `dbui-toolbar-btn dbui-density-btn dbui-icon-only-btn ${
-        config.settings.rowDensity === "compact" ? "is-active" : ""
-      }`,
-    });
-    densityBtn.setAttribute("title", "Toggle density (Compact / Comfortable)");
-    const densityIcon = densityBtn.createSpan({ cls: "dbui-btn-icon" });
-    setIcon(densityIcon, "rows-3");
-    densityBtn.addEventListener("click", async () => {
-      config.settings.rowDensity =
-        config.settings.rowDensity === "compact" ? "comfortable" : "compact";
-      await onConfigChange();
-      onDataUpdated();
-    });
 
     // Primary "+ New" Note button
     const newNoteBtn = rightGroup.createDiv({ cls: "dbui-toolbar-btn dbui-btn-primary" });
@@ -176,19 +161,6 @@ export class TableToolbar {
       } else if (badge) {
         badge.remove();
       }
-    }
-
-    // Update wrap button
-    const wrapBtn = container.querySelector(".dbui-wrap-btn") as HTMLElement;
-    if (wrapBtn) {
-      wrapBtn.toggleClass("is-active", Boolean(config.settings.wrapCells));
-      wrapBtn.setAttribute("title", config.settings.wrapCells ? "Disable wrap" : "Enable wrap");
-    }
-
-    // Update density button
-    const densityBtn = container.querySelector(".dbui-density-btn") as HTMLElement;
-    if (densityBtn) {
-      densityBtn.toggleClass("is-active", config.settings.rowDensity === "compact");
     }
   }
 }

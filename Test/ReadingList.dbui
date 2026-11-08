@@ -6,9 +6,9 @@
       "key": "file.name",
       "name": "Title",
       "type": "file",
-      "width": 200,
+      "width": 209,
       "visible": true,
-      "wrap": false
+      "wrap": true
     },
     {
       "key": "author",
@@ -64,11 +64,10 @@
     {
       "key": "test",
       "name": "test",
-      "type": "date",
+      "type": "text",
       "width": 160,
       "visible": true,
-      "wrap": false,
-      "dateFormat": "relative"
+      "wrap": false
     },
     {
       "key": "date",
@@ -78,6 +77,47 @@
       "visible": true,
       "wrap": false,
       "dateFormat": "relative"
+    },
+    {
+      "key": "test",
+      "name": "test",
+      "type": "text",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "test2",
+      "name": "test2",
+      "type": "text",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "test3",
+      "name": "test3",
+      "type": "text",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "hello",
+      "name": "hello",
+      "type": "text",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "t",
+      "name": "t",
+      "type": "number",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "numberFormat": "plain"
     }
   ],
   "sort": [],
@@ -86,7 +126,7 @@
   "statusOptions": {},
   "settings": {
     "wrapCells": false,
-    "rowDensity": "compact",
+    "rowDensity": "comfortable",
     "showRowNumbers": true
   }
 }

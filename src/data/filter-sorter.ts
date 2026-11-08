@@ -82,7 +82,7 @@ export class FilterSorter {
       );
     }
 
-    // Date special operators
+    // Checkbox special operators
     if (op === "is-today" || op === "is-past" || op === "is-future") {
       const d = parseDate(rawVal);
       if (!d) return false;
@@ -91,18 +91,49 @@ export class FilterSorter {
       if (op === "is-future") return isDateInFuture(d);
     }
 
+    // Boolean check
+    const boolVal = typeof rawVal === "boolean" ? rawVal : String(rawVal).toLowerCase() === "true";
+    if (String(op) === "is-checked") return Boolean(rawVal) === true;
+    if (String(op) === "is-unchecked") return Boolean(rawVal) === false;
+
     // Null checks for other operators
     if (rawVal === null || rawVal === undefined) return false;
+
+    // Date comparisons
+    const dateVal = parseDate(rawVal);
+    const dateTarget = parseDate(target);
+    if (dateVal && dateTarget) {
+      if (op === "less") return dateVal.getTime() < dateTarget.getTime();
+      if (op === "greater") return dateVal.getTime() > dateTarget.getTime();
+      if (op === "equals") {
+        return (
+          dateVal.getFullYear() === dateTarget.getFullYear() &&
+          dateVal.getMonth() === dateTarget.getMonth() &&
+          dateVal.getDate() === dateTarget.getDate()
+        );
+      }
+      if (op === "not-equals") {
+        return (
+          dateVal.getFullYear() !== dateTarget.getFullYear() ||
+          dateVal.getMonth() !== dateTarget.getMonth() ||
+          dateVal.getDate() !== dateTarget.getDate()
+        );
+      }
+    }
 
     // Number comparisons
     const numA = Number(rawVal);
     const numTarget = Number(target);
-    const isNum = !isNaN(numA) && !isNaN(numTarget);
+    const isNum = !isNaN(numA) && !isNaN(numTarget) && typeof rawVal !== "boolean";
 
-    if (op === "greater") return isNum && numA > numTarget;
-    if (op === "greater-equal") return isNum && numA >= numTarget;
-    if (op === "less") return isNum && numA < numTarget;
-    if (op === "less-equal") return isNum && numA <= numTarget;
+    if (isNum) {
+      if (op === "greater") return numA > numTarget;
+      if (op === "greater-equal") return numA >= numTarget;
+      if (op === "less") return numA < numTarget;
+      if (op === "less-equal") return numA <= numTarget;
+      if (op === "equals") return numA === numTarget;
+      if (op === "not-equals") return numA !== numTarget;
+    }
 
     // Array / Tag values
     if (Array.isArray(rawVal)) {

@@ -12,8 +12,6 @@ export class TableBody {
     app: App,
     frontmatterManager: FrontmatterManager,
     allVaultTags: string[],
-    quickSearch = "",
-    onClearSearch?: () => void,
     onNewNote?: () => Promise<void>,
     onConfigChange?: () => Promise<void>,
     onDataUpdated?: () => void
@@ -21,60 +19,6 @@ export class TableBody {
     tbody.empty();
 
     if (rows.length === 0) {
-      const trEmpty = tbody.createEl("tr", { cls: "dbui-empty-row" });
-      const tdEmpty = trEmpty.createEl("td", {
-        cls: "dbui-empty-td",
-        colspan: columns.length + (config.settings.showRowNumbers ? 1 : 0) + 1,
-      });
-      const emptyWrap = tdEmpty.createDiv({ cls: "dbui-empty-state" });
-
-      if (quickSearch && quickSearch.trim()) {
-        emptyWrap.createSpan({
-          cls: "dbui-empty-msg",
-          text: `No notes matching "${quickSearch.trim()}".`,
-        });
-        if (onClearSearch) {
-          const clearSearchBtn = emptyWrap.createDiv({
-            cls: "dbui-btn dbui-empty-create-btn",
-            text: "Clear search",
-          });
-          clearSearchBtn.addEventListener("click", () => {
-            onClearSearch();
-          });
-        }
-      } else if (config.filters && config.filters.length > 0) {
-        emptyWrap.createSpan({
-          cls: "dbui-empty-msg",
-          text: "No notes match the active filters.",
-        });
-        if (onConfigChange && onDataUpdated) {
-          const clearFiltersBtn = emptyWrap.createDiv({
-            cls: "dbui-btn dbui-empty-create-btn",
-            text: "Clear filters",
-          });
-          clearFiltersBtn.addEventListener("click", async () => {
-            config.filters = [];
-            await onConfigChange();
-            onDataUpdated();
-          });
-        }
-      } else {
-        emptyWrap.createSpan({
-          cls: "dbui-empty-msg",
-          text: config.folder
-            ? `No notes found in "${config.folder}".`
-            : "No notes found in vault root.",
-        });
-        if (onNewNote) {
-          const createFirstBtn = emptyWrap.createDiv({
-            cls: "dbui-btn dbui-btn-primary dbui-empty-create-btn",
-            text: "+ New Note",
-          });
-          createFirstBtn.addEventListener("click", async () => {
-            await onNewNote();
-          });
-        }
-      }
       return;
     }
 
@@ -104,9 +48,14 @@ export class TableBody {
         }
       });
 
-      // Data Cells
+      // Data Cells with strict min-width and max-width to keep wide tables structured
       columns.forEach((column) => {
-        const td = tr.createEl("td");
+        const td = tr.createEl("td", { cls: "dbui-td" });
+        const colWidth = column.width || 160;
+        td.style.width = `${colWidth}px`;
+        td.style.minWidth = `${colWidth}px`;
+        td.style.maxWidth = `${colWidth}px`;
+
         CellRenderer.renderCell(
           td,
           row,
@@ -120,11 +69,11 @@ export class TableBody {
         );
       });
 
-      // Trailing empty cell under "+ Add property" header
+      // Trailing empty cell under "+ Add property" sticky header
       tr.createEl("td", { cls: "dbui-td dbui-td-spacer" });
     });
 
-    // Bottom "+ New" row button
+    // Bottom "+ New note" row button spanning full table width
     const trNew = tbody.createEl("tr", { cls: "dbui-row dbui-row-new" });
     if (config.settings.showRowNumbers) {
       const tdNewIndex = trNew.createEl("td", { cls: "dbui-td dbui-td-index" });
@@ -137,7 +86,11 @@ export class TableBody {
       colspan: columns.length + 1,
     });
     const newBtn = tdNewAction.createDiv({ cls: "dbui-new-row-btn" });
-    newBtn.createSpan({ text: "+ New note" });
+    if (!config.settings.showRowNumbers) {
+      const plusIcon = newBtn.createSpan({ cls: "dbui-new-row-plus" });
+      setIcon(plusIcon, "plus");
+    }
+    newBtn.createSpan({ text: "New note" });
 
     trNew.addEventListener("click", async () => {
       if (onNewNote) {

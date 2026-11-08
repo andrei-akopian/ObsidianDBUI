@@ -1,4 +1,4 @@
-import { ColumnConfig, DBConfig, SortDirection, SortRule } from "../../types";
+import { ColumnConfig, DataType, DBConfig, SortDirection, SortRule } from "../../types";
 import { PopoverManager } from "../popover-manager";
 
 export class SortPopover {
@@ -34,6 +34,25 @@ export class SortPopover {
 
     const listContainer = popover.createDiv({ cls: "dbui-sort-list" });
 
+    const getDirectionLabels = (type: DataType) => {
+      switch (type) {
+        case "number":
+          return { asc: "0 → 9 (Smallest first)", desc: "9 → 0 (Largest first)" };
+        case "date":
+        case "time":
+          return { asc: "Oldest first (Ascending)", desc: "Newest first (Descending)" };
+        case "checkbox":
+          return { asc: "Unchecked first", desc: "Checked first" };
+        case "text":
+        case "file":
+        case "status":
+        case "tag":
+        case "multi-tag":
+        default:
+          return { asc: "A → Z (Ascending)", desc: "Z → A (Descending)" };
+      }
+    };
+
     const renderSorts = () => {
       listContainer.empty();
       updateClearBtn();
@@ -45,8 +64,16 @@ export class SortPopover {
       config.sort.forEach((sort, idx) => {
         const row = listContainer.createDiv({ cls: "dbui-sort-row" });
 
-        // Column select
-        const colSelect = row.createEl("select", { cls: "dbui-select" });
+        const currentCol = columns.find((c) => c.key === sort.key) || columns[0] || {
+          key: sort.key,
+          name: sort.key,
+          type: "text" as DataType,
+          width: 160,
+          visible: true,
+        };
+
+        // 1. Column select
+        const colSelect = row.createEl("select", { cls: "dbui-select dbui-sort-col-select" });
         for (const col of columns) {
           const opt = colSelect.createEl("option", { value: col.key, text: col.name });
           if (col.key === sort.key) opt.selected = true;
@@ -54,13 +81,17 @@ export class SortPopover {
         colSelect.addEventListener("change", async () => {
           sort.key = colSelect.value;
           await onConfigChange();
+          renderSorts();
+          reposition();
           onDataUpdated();
         });
 
-        // Direction select
-        const dirSelect = row.createEl("select", { cls: "dbui-select" });
-        const dirOptAsc = dirSelect.createEl("option", { value: "asc", text: "Ascending (A → Z)" });
-        const dirOptDesc = dirSelect.createEl("option", { value: "desc", text: "Descending (Z → A)" });
+        // 2. Datatype-aware direction select
+        const dirSelect = row.createEl("select", { cls: "dbui-select dbui-sort-dir-select" });
+        const labels = getDirectionLabels(currentCol.type);
+
+        const dirOptAsc = dirSelect.createEl("option", { value: "asc", text: labels.asc });
+        const dirOptDesc = dirSelect.createEl("option", { value: "desc", text: labels.desc });
         if (sort.direction === "asc") dirOptAsc.selected = true;
         else dirOptDesc.selected = true;
 
@@ -70,7 +101,7 @@ export class SortPopover {
           onDataUpdated();
         });
 
-        // Delete button
+        // 3. Delete button
         const delBtn = row.createDiv({ cls: "dbui-icon-btn dbui-del-btn", text: "×" });
         delBtn.setAttribute("title", "Remove sort");
         delBtn.addEventListener("click", async () => {

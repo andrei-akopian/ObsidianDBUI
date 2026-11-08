@@ -183,14 +183,27 @@ export class ColumnMenuPopover {
     // 3. Actions Divider
     popover.createDiv({ cls: "dbui-menu-divider" });
 
-    // Wrap toggle item
-    const wrapItem = popover.createDiv({ cls: "dbui-menu-action-item" });
-    wrapItem.createSpan({ text: column.wrap ? "Disable wrap text" : "Wrap text" });
-    wrapItem.addEventListener("click", async () => {
-      column.wrap = !column.wrap;
+    // Word Wrap toggle row
+    const wrapItem = popover.createDiv({ cls: "dbui-menu-toggle-row" });
+    wrapItem.createSpan({ cls: "dbui-menu-toggle-label", text: "Wrap text in cells" });
+    const wrapToggle = wrapItem.createEl("input", {
+      type: "checkbox",
+      cls: "dbui-toggle-checkbox",
+    });
+    wrapToggle.checked = Boolean(column.wrap);
+    const toggleWrap = async () => {
+      column.wrap = wrapToggle.checked;
       await onConfigChange();
-      close();
       onDataUpdated();
+    };
+    wrapToggle.addEventListener("change", (e) => {
+      e.stopPropagation();
+      toggleWrap();
+    });
+    wrapItem.addEventListener("click", (e) => {
+      if (e.target === wrapToggle) return;
+      wrapToggle.checked = !wrapToggle.checked;
+      toggleWrap();
     });
 
     // Sort items

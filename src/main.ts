@@ -117,6 +117,26 @@ export default class DBUIPlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "focus-dbui-search",
+      name: "Search active database table",
+      hotkeys: [{ modifiers: ["Mod"], key: "k" }],
+      checkCallback: (checking: boolean) => {
+        const activeLeaf = this.app.workspace.activeLeaf;
+        if (activeLeaf && activeLeaf.view) {
+          const searchInput = activeLeaf.view.containerEl.querySelector(".dbui-search-input") as HTMLInputElement;
+          if (searchInput) {
+            if (!checking) {
+              searchInput.focus();
+              searchInput.select();
+            }
+            return true;
+          }
+        }
+        return false;
+      },
+    });
+
     // 7. Context Menu on Folders
     this.registerEvent(
       this.app.workspace.on("file-menu", (menu: Menu, file) => {

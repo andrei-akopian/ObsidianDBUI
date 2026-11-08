@@ -25,6 +25,7 @@ export class DBTableView {
   private tableEl: HTMLTableElement;
   private theadEl: HTMLTableSectionElement;
   private tbodyEl: HTMLTableSectionElement;
+  private emptyContainerEl: HTMLElement;
 
   private rawRows: RowData[] = [];
   private processedRows: RowData[] = [];
@@ -67,6 +68,19 @@ export class DBTableView {
     this.tableEl = this.tableContainerEl.createEl("table", { cls: "dbui-table" });
     this.theadEl = this.tableEl.createEl("thead");
     this.tbodyEl = this.tableEl.createEl("tbody");
+
+    // Empty state container placed OUTSIDE the table to avoid cramped columns
+    this.emptyContainerEl = this.tableContainerEl.createDiv({ cls: "dbui-empty-container" });
+    this.emptyContainerEl.style.display = "none";
+
+    // Global Cmd/Ctrl + K shortcut inside table view
+    this.rootEl.addEventListener("keydown", (evt: KeyboardEvent) => {
+      if ((evt.metaKey || evt.ctrlKey) && evt.key.toLowerCase() === "k") {
+        evt.preventDefault();
+        evt.stopPropagation();
+        TableToolbar.focusSearch(this.toolbarEl);
+      }
+    });
   }
 
   private registerVaultEvents(): void {
@@ -227,6 +241,78 @@ export class DBTableView {
 
   private renderBody(): void {
     const visibleColumns = this.config.columns.filter((c) => c.visible !== false);
+
+    if (this.processedRows.length === 0) {
+      this.tbodyEl.empty();
+      this.emptyContainerEl.style.display = "flex";
+      this.emptyContainerEl.empty();
+
+      if (this.quickSearch && this.quickSearch.trim()) {
+        this.emptyContainerEl.createDiv({
+          cls: "dbui-empty-title",
+          text: `No notes matching "${this.quickSearch.trim()}".`,
+        });
+        const actions = this.emptyContainerEl.createDiv({ cls: "dbui-empty-actions" });
+        const clearBtn = actions.createDiv({
+          cls: "dbui-btn dbui-empty-create-btn",
+          text: "Clear search",
+        });
+        clearBtn.addEventListener("click", () => {
+          this.quickSearch = "";
+          const searchInput = this.toolbarEl.querySelector(".dbui-search-input") as HTMLInputElement;
+          if (searchInput) searchInput.value = "";
+          this.processedRows = FilterSorter.process(
+            this.rawRows,
+            this.config.filters,
+            this.config.sort,
+            ""
+          );
+          this.renderBody();
+        });
+      } else if (this.config.filters && this.config.filters.length > 0) {
+        this.emptyContainerEl.createDiv({
+          cls: "dbui-empty-title",
+          text: "No notes match active filters.",
+        });
+        const actions = this.emptyContainerEl.createDiv({ cls: "dbui-empty-actions" });
+        const clearBtn = actions.createDiv({
+          cls: "dbui-btn dbui-empty-create-btn",
+          text: "Clear filters",
+        });
+        clearBtn.addEventListener("click", async () => {
+          this.config.filters = [];
+          await this.saveConfig();
+          this.processedRows = FilterSorter.process(
+            this.rawRows,
+            this.config.filters,
+            this.config.sort,
+            this.quickSearch
+          );
+          this.renderHeaderAndBody();
+          TableToolbar.updateBadges(this.toolbarEl, this.config);
+        });
+      } else {
+        this.emptyContainerEl.createDiv({
+          cls: "dbui-empty-title",
+          text: this.config.folder
+            ? `No notes found in "${this.config.folder}".`
+            : "No notes found in vault root.",
+        });
+        const actions = this.emptyContainerEl.createDiv({ cls: "dbui-empty-actions" });
+        const createBtn = actions.createDiv({
+          cls: "dbui-btn dbui-btn-primary dbui-empty-create-btn",
+          text: "+ New note",
+        });
+        createBtn.addEventListener("click", async () => {
+          await this.handleCreateNewNote();
+        });
+      }
+      return;
+    }
+
+    // When rows exist, hide empty container and render table body
+    this.emptyContainerEl.style.display = "none";
+
     TableBody.render(
       this.tbodyEl,
       this.processedRows,
@@ -235,19 +321,6 @@ export class DBTableView {
       this.app,
       this.frontmatterManager,
       this.allVaultTags,
-      this.quickSearch,
-      () => {
-        this.quickSearch = "";
-        const searchInput = this.toolbarEl.querySelector(".dbui-search-input") as HTMLInputElement;
-        if (searchInput) searchInput.value = "";
-        this.processedRows = FilterSorter.process(
-          this.rawRows,
-          this.config.filters,
-          this.config.sort,
-          ""
-        );
-        this.renderBody();
-      },
       async () => {
         await this.handleCreateNewNote();
       },
