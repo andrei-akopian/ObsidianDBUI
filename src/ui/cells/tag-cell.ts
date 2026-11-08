@@ -279,29 +279,33 @@ export class TagCell {
     tagColors: Record<string, TagColor>,
     onSelectColor: (color: TagColor) => Promise<void>
   ): void {
-    const { el: colorMenu, close } = PopoverManager.createPopover({
+    const { el: colorMenu, close, reposition } = PopoverManager.createPopover({
       anchor,
       cls: "dbui-color-picker-popover",
       allowNested: true,
+      offset: 6,
     });
 
     const isDark = document.body.classList.contains("theme-dark");
+    const grid = colorMenu.createDiv({ cls: "dbui-color-grid" });
 
     for (const preset of COLOR_PALETTE) {
-      const row = colorMenu.createDiv({ cls: "dbui-color-preset-row" });
-      const swatch = row.createDiv({ cls: "dbui-color-swatch" });
       const bg = isDark ? preset.bgDark : preset.bgLight;
       const text = isDark ? preset.textDark : preset.textLight;
 
-      swatch.style.backgroundColor = bg;
-      swatch.style.color = text;
-      swatch.createSpan({ text: preset.name });
+      const cell = grid.createDiv({
+        cls: "dbui-color-swatch-cell",
+        attr: { title: preset.name },
+      });
+      cell.style.backgroundColor = text;
 
-      row.addEventListener("click", async (e) => {
+      cell.addEventListener("click", async (e) => {
         e.stopPropagation();
         close();
         await onSelectColor({ bg, text });
       });
     }
+
+    reposition();
   }
 }

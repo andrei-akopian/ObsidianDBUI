@@ -1,4 +1,4 @@
-import { App, debounce, EventRef, Notice, TFile } from "obsidian";
+import { App, debounce, EventRef, Menu, Notice, TFile } from "obsidian";
 import { DEFAULT_DB_CONFIG } from "../constants";
 import { FilterSorter } from "../data/filter-sorter";
 import { FrontmatterManager } from "../data/frontmatter-manager";
@@ -88,6 +88,23 @@ export class DBTableView {
         evt.stopPropagation();
         TableToolbar.focusSearch(this.toolbarEl);
       }
+    });
+
+    // Right-click empty container area opens context menu with "New note"
+    this.tableContainerEl.addEventListener("contextmenu", (evt) => {
+      const target = evt.target as HTMLElement;
+      if (target.closest(".dbui-row") || target.closest(".dbui-th")) return;
+      evt.preventDefault();
+      const menu = new Menu();
+      menu.addItem((item) => {
+        item
+          .setTitle("New note")
+          .setIcon("plus")
+          .onClick(async () => {
+            await this.handleCreateNewNote();
+          });
+      });
+      menu.showAtMouseEvent(evt);
     });
   }
 
@@ -351,8 +368,21 @@ export class DBTableView {
 
     if (created) {
       await this.refreshData(false);
-      // Reveal row
       new Notice(`Created "${created.basename}".`);
+
+      // Scroll the user to the newly created note's location and highlight it
+      setTimeout(() => {
+        const targetRow = this.tbodyEl.querySelector(
+          `tr[data-path="${CSS.escape(created.path)}"]`
+        ) as HTMLElement;
+        if (targetRow) {
+          targetRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          targetRow.addClass("dbui-row-newly-created");
+          setTimeout(() => {
+            targetRow.removeClass("dbui-row-newly-created");
+          }, 1800);
+        }
+      }, 50);
     }
   }
 

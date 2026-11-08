@@ -31,6 +31,4 @@ Desired featureset:
 
 ## TODO
 
-- \[ \] Remove accent border form search results
-- \[ \] add accent border on the sticky property column
-- \[ \] make "New Note" full row width
+- \[ \] integrate a mass processing system for changing types, renaming properties, and renaming tags

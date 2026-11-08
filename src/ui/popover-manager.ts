@@ -22,6 +22,13 @@ export class PopoverManager {
     window.addEventListener("popstate", () => {
       this.closeAll();
     });
+
+    // Close on visibility change (tab/window switch)
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        this.closeAll();
+      }
+    });
   }
 
   /**
@@ -72,8 +79,10 @@ export class PopoverManager {
 
       // Unbind event listeners
       document.removeEventListener("mousedown", onMouseDown, true);
+      document.removeEventListener("pointerdown", onMouseDown, true);
       document.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("resize", onWindowResize);
+      clearInterval(disconnectCheck);
 
       // Remove from active list
       for (const entry of Array.from(this.activeEntries)) {
@@ -122,8 +131,15 @@ export class PopoverManager {
     };
 
     document.addEventListener("mousedown", onMouseDown, true);
+    document.addEventListener("pointerdown", onMouseDown, true);
     document.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("resize", onWindowResize);
+
+    const disconnectCheck = window.setInterval(() => {
+      if (options.anchor && !options.anchor.isConnected) {
+        close();
+      }
+    }, 200);
 
     const reposition = () => {
       if (isClosed) return;

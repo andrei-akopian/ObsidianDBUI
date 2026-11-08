@@ -6,9 +6,12 @@ export function positionPopover(popover: HTMLElement, anchor: HTMLElement, offse
 
   const winWidth = window.innerWidth;
   const winHeight = window.innerHeight;
-  const popoverRect = popover.getBoundingClientRect();
 
-  // If anchor is disconnected or has zero dimensions, do not position to (0, 0)
+  // Guarantee fixed positioning before measuring bounds
+  popover.style.position = "fixed";
+  popover.style.zIndex = "9999";
+
+  // If anchor is disconnected, do not reposition to (0, 0)
   if (!anchor.isConnected) {
     if (popover.style.top && popover.style.left) return;
   }
@@ -22,18 +25,24 @@ export function positionPopover(popover: HTMLElement, anchor: HTMLElement, offse
   ) {
     if (popover.style.top && popover.style.left) return;
     // Default fallback: place near top-center of window
-    popover.style.position = "fixed";
-    popover.style.left = `${Math.round(Math.max(10, (winWidth - popoverRect.width) / 2))}px`;
+    popover.style.left = `${Math.round(Math.max(10, (winWidth - 220) / 2))}px`;
     popover.style.top = "60px";
-    popover.style.zIndex = "9999";
     return;
   }
 
-  // Horizontal position
+  const popoverRect = popover.getBoundingClientRect();
+
+  // Horizontal position:
+  // If placing left-aligned overflows window, align with right edge of anchor
   let left = anchorRect.left;
   if (left + popoverRect.width > winWidth - 10) {
-    left = Math.max(10, winWidth - popoverRect.width - 10);
+    left = anchorRect.right - popoverRect.width;
   }
+  // Clamp inside right edge
+  if (left + popoverRect.width > winWidth - 10) {
+    left = winWidth - popoverRect.width - 10;
+  }
+  // Clamp inside left edge
   left = Math.max(10, left);
 
   // Vertical position: prefer below anchor, flip to above if not enough space
@@ -46,10 +55,8 @@ export function positionPopover(popover: HTMLElement, anchor: HTMLElement, offse
   }
   top = Math.max(10, Math.min(top, winHeight - popoverRect.height - 10));
 
-  popover.style.position = "fixed";
   popover.style.left = `${Math.round(left)}px`;
   popover.style.top = `${Math.round(top)}px`;
-  popover.style.zIndex = "9999";
 }
 
 /**

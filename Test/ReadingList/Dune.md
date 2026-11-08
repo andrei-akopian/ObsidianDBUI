@@ -6,6 +6,6 @@ generes:
   - sci-fi
   - classic
   - adventure
-status: true
+status: unfinished
 ---
 A masterpiece of science fiction set on the desert planet Arrakis.

@@ -72,8 +72,11 @@ export class CellRenderer {
           config.statusOptions,
           onCommit,
           async (options) => {
+            if (!config.statusOptions) config.statusOptions = {};
             config.statusOptions[column.key] = options;
+            column.options = options;
             await onConfigChange();
+            onDataUpdated();
           }
         );
         break;

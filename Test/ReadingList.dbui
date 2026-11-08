@@ -6,7 +6,7 @@
       "key": "file.name",
       "name": "Title",
       "type": "file",
-      "width": 209,
+      "width": 188,
       "visible": true,
       "wrap": true
     },
@@ -14,26 +14,26 @@
       "key": "author",
       "name": "Author",
       "type": "text",
-      "width": 150,
+      "width": 124,
       "visible": true,
       "wrap": false
     },
     {
       "key": "status",
       "name": "Status",
-      "type": "tag",
-      "width": 130,
+      "type": "status",
+      "width": 74,
       "visible": true,
       "wrap": false,
       "options": [
         {
-          "id": "unfinished",
-          "label": "unfinished",
+          "id": "reading",
+          "label": "reading",
           "color": ""
         },
         {
-          "id": "reading",
-          "label": "reading",
+          "id": "unfinished",
+          "label": "unfinished",
           "color": ""
         },
         {
@@ -47,7 +47,7 @@
       "key": "rating",
       "name": "Rating",
       "type": "number",
-      "width": 140,
+      "width": 60,
       "visible": true,
       "wrap": false,
       "numberFormat": "progress-bar",
@@ -122,8 +122,31 @@
   ],
   "sort": [],
   "filters": [],
-  "tagColors": {},
-  "statusOptions": {},
+  "tagColors": {
+    "sci-fi": {
+      "bg": "#2c2e33",
+      "text": "#adb5bd"
+    }
+  },
+  "statusOptions": {
+    "status": [
+      {
+        "id": "reading",
+        "label": "reading",
+        "color": ""
+      },
+      {
+        "id": "unfinished",
+        "label": "unfinished",
+        "color": ""
+      },
+      {
+        "id": "completed",
+        "label": "completed",
+        "color": ""
+      }
+    ]
+  },
   "settings": {
     "wrapCells": false,
     "rowDensity": "comfortable",

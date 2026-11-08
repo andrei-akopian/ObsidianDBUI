@@ -345,9 +345,20 @@
   top: 0 !important;
   z-index: 8 !important;
   background-color: var(--background-secondary) !important;
-  border-left: 2px solid var(--interactive-accent) !important;
-  box-shadow: -1px 0 0 var(--interactive-accent);
+  box-shadow: inset 2px 0 0 0 var(--interactive-accent) !important;
   border-right: none;
+}
+
+.dbui-th-add-col::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--interactive-accent);
+  z-index: 10;
+  pointer-events: none;
 }
 
 .dbui-td-spacer {
@@ -356,10 +367,21 @@
   position: sticky !important;
   right: 0 !important;
   z-index: 4 !important;
-  background-color: var(--background-primary) !important;
-  border-left: 2px solid var(--interactive-accent) !important;
-  box-shadow: -1px 0 0 var(--interactive-accent);
+  background-color: var(--background-secondary) !important;
+  box-shadow: inset 2px 0 0 0 var(--interactive-accent) !important;
   border-right: none;
+}
+
+.dbui-td-spacer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--interactive-accent);
+  z-index: 10;
+  pointer-events: none;
 }
 
 .dbui-add-col-btn {
@@ -460,57 +482,78 @@ body.is-resizing-column {
   background-color: var(--dbui-hover-bg) !important;
 }
 
-/* Bottom New Row */
+/* Bottom New Row - Full-row Gray Button */
 .dbui-row-new {
   cursor: pointer;
-  color: var(--text-faint);
-  border-bottom: 1px solid var(--dbui-border-color);
   width: 100%;
 }
 
 .dbui-td-new-action {
-  border-right: none !important;
-  cursor: pointer;
-  color: var(--text-faint);
-  user-select: none;
-  padding: 6px 12px !important;
-  width: 100% !important;
+  border: none !important;
+  border-bottom: 1px solid var(--dbui-border-color) !important;
+  padding: 6px 8px !important;
+  width: auto !important;
+  max-width: none !important;
+  box-sizing: border-box;
+  background: transparent !important;
 }
 
 .dbui-new-row-btn {
-  display: flex;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 8px !important;
+  width: 100% !important;
+  min-width: 100% !important;
+  box-sizing: border-box !important;
+  padding: 8px 14px !important;
+  border-radius: 4px !important;
+  background-color: var(--background-secondary, rgba(255, 255, 255, 0.08)) !important;
+  border: 1px dashed var(--dbui-border-color) !important;
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
+}
+
+.dbui-new-row-btn:hover,
+.dbui-row-new:hover .dbui-new-row-btn {
+  background-color: var(--background-modifier-hover, rgba(255, 255, 255, 0.12)) !important;
+  border-color: var(--interactive-accent) !important;
+  border-style: solid !important;
+  color: var(--text-normal) !important;
+}
+
+.dbui-new-row-plus {
+  display: inline-flex;
   align-items: center;
-  font-size: 12.5px;
-  width: 100%;
-}
-
-.dbui-row-new:hover .dbui-td-new-action,
-.dbui-row-new:hover .dbui-td-index,
-.dbui-row-new:hover {
-  color: var(--text-normal);
-  background-color: var(--dbui-hover-bg) !important;
-}
-
-/* Search Results Left Accent Border */
-.dbui-root.is-search-active .dbui-row {
-  border-left: 3px solid var(--interactive-accent) !important;
-}
-
-.dbui-root.is-search-active .dbui-td-index {
-  border-left: 3px solid var(--interactive-accent) !important;
+  justify-content: center;
+  color: var(--interactive-accent);
 }
 
 .dbui-new-row-plus svg {
-  width: 12px;
-  height: 12px;
-  opacity: 0.6;
+  width: 13px !important;
+  height: 13px !important;
+  stroke-width: 2.5;
 }
 
-.dbui-new-row-btn {
-  display: flex;
-  align-items: center;
-  font-size: 12px;
-  padding: 2px 4px;
+/* Row scroll-to highlight animation */
+@keyframes dbui-flash-highlight {
+  0% {
+    background-color: var(--background-modifier-active-hover);
+  }
+  30% {
+    background-color: rgba(var(--interactive-accent-rgb, 100, 100, 255), 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.dbui-row.dbui-row-newly-created {
+  animation: dbui-flash-highlight 1.8s ease-out;
 }
 
 /* --------------------------------------------------------------------------
@@ -664,7 +707,7 @@ body.is-resizing-column {
 
 .dbui-progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--interactive-accent), #10b981);
+  background-color: var(--interactive-accent);
   border-radius: 3px;
   transition: width 0.2s ease;
 }
@@ -725,6 +768,8 @@ body.is-resizing-column {
    Popovers (Status, Tag, Calendar, Menu, Filters)
    -------------------------------------------------------------------------- */
 .dbui-popover {
+  position: fixed !important;
+  z-index: 9999 !important;
   background-color: var(--background-secondary);
   border: 1px solid var(--dbui-border-color);
   border-radius: 6px;
@@ -735,6 +780,7 @@ body.is-resizing-column {
   font-size: 12px;
   color: var(--text-normal);
   user-select: none;
+  box-sizing: border-box;
 }
 
 .dbui-popover-header {
@@ -827,22 +873,95 @@ body.is-resizing-column {
 }
 
 .dbui-color-dot-btn {
-  width: 10px;
-  height: 10px;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.1s ease;
+}
+
+.dbui-color-dot-btn:hover {
+  transform: scale(1.25);
+}
+
+.dbui-status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  user-select: none;
+}
+
+.dbui-status-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.35;
+  cursor: grab;
+  flex-shrink: 0;
+  transition: opacity 0.1s ease;
+}
+
+.dbui-status-item:hover .dbui-status-drag-handle {
+  opacity: 0.85;
+}
+
+.dbui-status-drag-handle svg {
+  width: 12px;
+  height: 12px;
+}
+
+.dbui-status-item.is-dragging {
+  opacity: 0.3;
+}
+
+.dbui-status-item.is-drag-over {
+  border-top: 2px solid var(--interactive-accent);
+}
+
+.dbui-item-check-spacer {
+  width: 14px;
   flex-shrink: 0;
 }
 
-/* Color Picker Popover */
+/* Color Picker Popover - Compact 7x2 Palette Grid */
 .dbui-color-picker-popover {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  max-height: 240px;
-  overflow-y: auto;
-  min-width: 140px;
+  position: fixed !important;
+  z-index: 10000 !important;
+  padding: 8px !important;
+  min-width: unset !important;
+  width: max-content !important;
+  max-width: none !important;
+  border-radius: 6px !important;
+  background-color: var(--background-secondary) !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35) !important;
+  box-sizing: border-box !important;
+}
+
+.dbui-color-grid {
+  display: grid !important;
+  grid-template-columns: repeat(7, 22px) !important;
+  grid-template-rows: repeat(2, 22px) !important;
+  gap: 6px !important;
+  padding: 2px !important;
+}
+
+.dbui-color-swatch-cell {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 4px !important;
+  cursor: pointer !important;
+  transition: transform 0.12s ease, box-shadow 0.12s ease !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+.dbui-color-swatch-cell:hover {
+  transform: scale(1.22) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+  z-index: 2 !important;
 }
 
 .dbui-color-preset-row {
@@ -1204,9 +1323,8 @@ body.is-resizing-column {
 }
 
 .dbui-empty-container.is-search-empty {
-  border-left: 3px solid var(--interactive-accent) !important;
   background-color: var(--background-secondary);
-  border-radius: 0 6px 6px 0;
+  border-radius: 6px;
   margin: 16px 20px;
   padding: 24px 20px !important;
   width: calc(100% - 40px) !important;

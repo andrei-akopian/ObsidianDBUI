@@ -1,3 +1,4 @@
+import { setIcon } from "obsidian";
 import { COLOR_PALETTE } from "../../constants";
 import { resolveTagColor } from "../../data/color-palette";
 import { ColumnConfig, RowData, StatusOption, TagColor } from "../../types";
@@ -67,9 +68,54 @@ export class StatusCell {
       const q = filter.trim().toLowerCase();
       const matched = existingOptions.filter((opt) => opt.label.toLowerCase().includes(q));
 
-      for (const opt of matched) {
+      for (let i = 0; i < matched.length; i++) {
+        const opt = matched[i];
+        const originalIndex = existingOptions.findIndex(
+          (o) => o.id === opt.id || o.label.toLowerCase() === opt.label.toLowerCase()
+        );
+
         const item = listContainer.createDiv({
-          cls: `dbui-popover-item ${opt.label.toLowerCase() === currentStatus.toLowerCase() ? "is-selected" : ""}`,
+          cls: `dbui-popover-item dbui-status-item ${
+            opt.label.toLowerCase() === currentStatus.toLowerCase() ? "is-selected" : ""
+          }`,
+        });
+        item.setAttribute("draggable", "true");
+
+        // Drag handle with grip-vertical icon
+        const dragHandle = item.createDiv({
+          cls: "dbui-status-drag-handle",
+          attr: { title: "Drag to reorder" },
+        });
+        setIcon(dragHandle, "grip-vertical");
+
+        // Drag & Drop reorder
+        item.addEventListener("dragstart", (e) => {
+          e.dataTransfer?.setData("text/plain", String(originalIndex));
+          item.addClass("is-dragging");
+        });
+        item.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          item.addClass("is-drag-over");
+        });
+        item.addEventListener("dragleave", () => {
+          item.removeClass("is-drag-over");
+        });
+        item.addEventListener("drop", async (e) => {
+          e.preventDefault();
+          item.removeClass("is-drag-over");
+          const fromIdx = parseInt(e.dataTransfer?.getData("text/plain") || "-1", 10);
+          if (fromIdx >= 0 && fromIdx !== originalIndex && fromIdx < existingOptions.length) {
+            const [moved] = existingOptions.splice(fromIdx, 1);
+            existingOptions.splice(originalIndex, 0, moved);
+            statusOptionsMap[column.key] = [...existingOptions];
+            column.options = [...existingOptions];
+            await onSaveStatusOptions(existingOptions);
+            renderList(searchInput.value);
+            reposition();
+          }
+        });
+        item.addEventListener("dragend", () => {
+          item.removeClass("is-dragging");
         });
 
         const color = resolveTagColor(opt.label, tagColors);
@@ -81,9 +127,11 @@ export class StatusCell {
         // Checkmark if selected
         if (opt.label.toLowerCase() === currentStatus.toLowerCase()) {
           item.createSpan({ cls: "dbui-item-check", text: "✓" });
+        } else {
+          item.createSpan({ cls: "dbui-item-check-spacer" });
         }
 
-        // Color change button
+        // Color change button (opens palette grid)
         const colorBtn = item.createDiv({ cls: "dbui-color-dot-btn" });
         colorBtn.style.backgroundColor = color.text;
         colorBtn.setAttribute("title", "Change color");
@@ -183,29 +231,33 @@ export class StatusCell {
     tagColors: Record<string, TagColor>,
     onSelectColor: (color: TagColor) => Promise<void>
   ): void {
-    const { el: colorMenu, close } = PopoverManager.createPopover({
+    const { el: colorMenu, close, reposition } = PopoverManager.createPopover({
       anchor,
       cls: "dbui-color-picker-popover",
       allowNested: true,
+      offset: 6,
     });
 
     const isDark = document.body.classList.contains("theme-dark");
+    const grid = colorMenu.createDiv({ cls: "dbui-color-grid" });
 
     for (const preset of COLOR_PALETTE) {
-      const row = colorMenu.createDiv({ cls: "dbui-color-preset-row" });
-      const swatch = row.createDiv({ cls: "dbui-color-swatch" });
       const bg = isDark ? preset.bgDark : preset.bgLight;
       const text = isDark ? preset.textDark : preset.textLight;
 
-      swatch.style.backgroundColor = bg;
-      swatch.style.color = text;
-      swatch.createSpan({ text: preset.name });
+      const cell = grid.createDiv({
+        cls: "dbui-color-swatch-cell",
+        attr: { title: preset.name },
+      });
+      cell.style.backgroundColor = text;
 
-      row.addEventListener("click", async (e) => {
+      cell.addEventListener("click", async (e) => {
         e.stopPropagation();
         close();
         await onSelectColor({ bg, text });
       });
     }
+
+    reposition();
   }
 }

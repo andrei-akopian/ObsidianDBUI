@@ -24,6 +24,7 @@ export class TableBody {
 
     rows.forEach((row, rowIndex) => {
       const tr = tbody.createEl("tr", { cls: "dbui-row" });
+      tr.setAttribute("data-path", row.path);
 
       // Index Cell
       if (config.settings.showRowNumbers) {
@@ -33,9 +34,7 @@ export class TableBody {
         // Context menu on index cell or row right click
         tdIndex.addEventListener("contextmenu", (evt) => {
           evt.preventDefault();
-          if (onDataUpdated) {
-            this.showRowContextMenu(evt, row, app, frontmatterManager, onDataUpdated);
-          }
+          this.showRowContextMenu(evt, row, app, frontmatterManager, onNewNote, onDataUpdated);
         });
       }
 
@@ -43,9 +42,7 @@ export class TableBody {
         // Only trigger if not already handling input
         if ((evt.target as HTMLElement).tagName === "INPUT") return;
         evt.preventDefault();
-        if (onDataUpdated) {
-          this.showRowContextMenu(evt, row, app, frontmatterManager, onDataUpdated);
-        }
+        this.showRowContextMenu(evt, row, app, frontmatterManager, onNewNote, onDataUpdated);
       });
 
       // Data Cells with minimum and ideal width
@@ -74,21 +71,17 @@ export class TableBody {
 
     // Bottom "+ New note" row button spanning full table width
     const trNew = tbody.createEl("tr", { cls: "dbui-row dbui-row-new" });
-    if (config.settings.showRowNumbers) {
-      const tdNewIndex = trNew.createEl("td", { cls: "dbui-td dbui-td-index" });
-      const plusIcon = tdNewIndex.createSpan({ cls: "dbui-new-row-plus" });
-      setIcon(plusIcon, "plus");
-    }
+    const totalCols = columns.length + (config.settings.showRowNumbers ? 1 : 0) + 1;
 
     const tdNewAction = trNew.createEl("td", {
       cls: "dbui-td dbui-td-new-action",
-      colspan: columns.length + 1,
+      attr: { colspan: String(totalCols) },
     });
+    tdNewAction.colSpan = totalCols;
+
     const newBtn = tdNewAction.createDiv({ cls: "dbui-new-row-btn" });
-    if (!config.settings.showRowNumbers) {
-      const plusIcon = newBtn.createSpan({ cls: "dbui-new-row-plus" });
-      setIcon(plusIcon, "plus");
-    }
+    const plusIcon = newBtn.createSpan({ cls: "dbui-new-row-plus" });
+    setIcon(plusIcon, "plus");
     newBtn.createSpan({ text: "New note" });
 
     trNew.addEventListener("click", async () => {
@@ -103,9 +96,23 @@ export class TableBody {
     row: RowData,
     app: App,
     frontmatterManager: FrontmatterManager,
-    onDataUpdated: () => void
+    onNewNote?: () => Promise<void>,
+    onDataUpdated?: () => void
   ): void {
     const menu = new Menu();
+
+    menu.addItem((item) => {
+      item
+        .setTitle("New note")
+        .setIcon("plus")
+        .onClick(async () => {
+          if (onNewNote) {
+            await onNewNote();
+          }
+        });
+    });
+
+    menu.addSeparator();
 
     menu.addItem((item) => {
       item
