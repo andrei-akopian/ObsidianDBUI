@@ -1,3 +1,13 @@
+# Obsidian DB UI Plugin
+
+This is a plugin for giving obsidian "bases" (databases) a good UI, similar to notion. Author believes this plugin has a more refined UI than similar plugins such as DataLoop, or GoodBases, or Notion Bases plugins.
+
+> [!WARNING]
+>
+> Code is LLM written. The author has used it for less than \*\*1\*\* days. His use case is managing his ~1000 book reading list. Functionality outside this range might be poor.
+
+
+
 The goal of this project is to create an obsidian base view with extremely good UI.
 
 A number of similar plugins exist (e.g. DataLoom) as well as Obsidian's default "base" view, and are installed in the \`Test\` vault, but lack various types of functionalities.
