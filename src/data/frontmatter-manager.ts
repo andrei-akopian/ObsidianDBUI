@@ -1,5 +1,7 @@
-import { App, normalizePath, Notice, TFile, TFolder } from "obsidian";
+import { App, normalizePath, Notice, stringifyYaml, TFile, TFolder } from "obsidian";
 import { DataType } from "../types";
+import { normalizeTag } from "../utils/string-utils";
+import { toBool, toNumeric } from "./value-processor";
 
 export class FrontmatterManager {
   private app: App;
@@ -27,6 +29,24 @@ export class FrontmatterManager {
   }
 
   /**
+   * Validate a note filename to prevent illegal filesystem and obsidian markdown characters.
+   */
+  static isValidFileName(name: string): { valid: boolean; reason?: string } {
+    const trimmed = name.trim();
+    if (!trimmed) {
+      return { valid: false, reason: "Filename cannot be empty." };
+    }
+    // Illegal OS characters and Obsidian link syntax characters
+    if (/[\/\\:*?"<>|#^\[\]]/.test(trimmed)) {
+      return {
+        valid: false,
+        reason: 'Filename cannot contain \\ / : * ? " < > | # ^ [ ]',
+      };
+    }
+    return { valid: true };
+  }
+
+  /**
    * Update a property in a note's frontmatter.
    */
   async updateProperty(
@@ -41,6 +61,13 @@ export class FrontmatterManager {
     if (key === "file.name") {
       const newName = String(value).trim();
       if (!newName || newName === file.basename) return true;
+
+      const validation = FrontmatterManager.isValidFileName(newName);
+      if (!validation.valid) {
+        new Notice(validation.reason || "Invalid note name.");
+        return false;
+      }
+
       const parentPath = file.parent ? file.parent.path : "";
       const ext = file.extension ? `.${file.extension}` : ".md";
       const newPath = normalizePath(parentPath ? `${parentPath}/${newName}${ext}` : `${newName}${ext}`);
@@ -53,23 +80,36 @@ export class FrontmatterManager {
       }
     }
 
-    // Coerce value based on type
+    // Coerce value based on data type
     let finalValue: any = value;
     if (value === null || value === undefined || value === "") {
       finalValue = null;
-    } else if (type === "number") {
-      const num = Number(value);
-      finalValue = isNaN(num) ? value : num;
     } else if (type === "checkbox") {
-      finalValue = Boolean(value);
-    } else if (type === "multi-tag" || type === "tag") {
+      finalValue = toBool(value);
+    } else if (type === "number") {
+      const num = toNumeric(value);
+      finalValue = num !== null ? num : value;
+    } else if (type === "multi-tag") {
       if (Array.isArray(value)) {
-        finalValue = value.length === 0 ? null : value;
+        const arr = value
+          .map((v) => (typeof v === "string" ? normalizeTag(v) : String(v)))
+          .filter(Boolean);
+        finalValue = arr.length > 0 ? arr : null;
       } else if (typeof value === "string") {
-        const arr = value.split(",").map((s) => s.trim()).filter(Boolean);
-        finalValue = arr.length > 1 ? arr : (arr[0] || null);
+        const arr = value
+          .split(",")
+          .map((s) => normalizeTag(s))
+          .filter(Boolean);
+        finalValue = arr.length > 0 ? arr : null;
       } else {
-        finalValue = value;
+        finalValue = [String(value)];
+      }
+    } else if (type === "tag") {
+      if (Array.isArray(value)) {
+        const first = value[0];
+        finalValue = first ? normalizeTag(String(first)) : null;
+      } else {
+        finalValue = normalizeTag(String(value)) || null;
       }
     }
 
@@ -84,15 +124,17 @@ export class FrontmatterManager {
         );
         const targetKey = existingKeys.length > 0 ? existingKeys[0] : key;
 
-        // Clean up duplicates if any exist
-        for (const k of existingKeys) {
-          delete fm[k];
+        // Clean up only duplicate keys (leaving the original targetKey in place)
+        for (let i = 1; i < existingKeys.length; i++) {
+          delete fm[existingKeys[i]];
         }
 
         if (finalValue === null || finalValue === undefined || finalValue === "") {
+          delete fm[targetKey];
           return;
         }
 
+        // Assign in-place preserving property position in YAML
         fm[targetKey] = finalValue;
       });
       return true;
@@ -106,7 +148,7 @@ export class FrontmatterManager {
   }
 
   /**
-   * Create a new note in a target folder.
+   * Create a new note in a target folder using stringifyYaml for safe YAML serialization.
    */
   async createNote(
     folderPath: string,
@@ -129,24 +171,20 @@ export class FrontmatterManager {
       candidatePath = normalizePath(basePath ? `${basePath}/${baseName}.md` : `${baseName}.md`);
     }
 
-    // Prepare frontmatter YAML string
+    // Prepare frontmatter data object
     const fmKeys = Object.keys(initialValues).filter((k) => k !== "file.name");
-    let content = "";
-    if (fmKeys.length > 0) {
-      content += "---\n";
-      for (const k of fmKeys) {
-        const val = initialValues[k];
-        if (val !== undefined && val !== null && val !== "") {
-          if (Array.isArray(val)) {
-            content += `${k}:\n${val.map((v) => `  - ${v}`).join("\n")}\n`;
-          } else if (typeof val === "string") {
-            content += `${k}: "${val.replace(/"/g, '\\"')}"\n`;
-          } else {
-            content += `${k}: ${val}\n`;
-          }
-        }
+    const fmData: Record<string, any> = {};
+
+    for (const k of fmKeys) {
+      const val = initialValues[k];
+      if (val !== undefined && val !== null && val !== "") {
+        fmData[k] = val;
       }
-      content += "---\n\n";
+    }
+
+    let content = "";
+    if (Object.keys(fmData).length > 0) {
+      content = `---\n${stringifyYaml(fmData)}---\n\n`;
     }
 
     try {
@@ -160,35 +198,11 @@ export class FrontmatterManager {
   }
 
   /**
-   * Rename a frontmatter key across all notes in a folder.
-   */
-  async renamePropertyAcrossFolder(
-    files: TFile[],
-    oldKey: string,
-    newKey: string
-  ): Promise<void> {
-    if (!oldKey || !newKey || oldKey === newKey) return;
-    for (const file of files) {
-      await this.app.fileManager.processFrontMatter(file, (fm) => {
-        const matchingKey = Object.keys(fm).find(
-          (k) => k.toLowerCase() === oldKey.toLowerCase()
-        );
-        if (matchingKey && fm[matchingKey] !== undefined) {
-          const val = fm[matchingKey];
-          delete fm[matchingKey];
-          fm[newKey] = val;
-        }
-      });
-    }
-    new Notice(`Renamed "${oldKey}" to "${newKey}" across ${files.length} notes.`);
-  }
-
-  /**
-   * Delete a note (move to trash).
+   * Delete a note (move to trash) respecting user's Obsidian deletion preference.
    */
   async deleteNote(file: TFile): Promise<boolean> {
     try {
-      await this.app.vault.trash(file, false);
+      await this.app.fileManager.trashFile(file);
       new Notice(`Moved "${file.basename}" to trash.`);
       return true;
     } catch (err) {

@@ -2,54 +2,41 @@ import { positionPopover } from "../utils/dom-utils";
 
 interface ActivePopoverEntry {
   el: HTMLElement;
+  anchor: HTMLElement;
   close: () => void;
 }
 
 export class PopoverManager {
-  private static activeEntries: Set<ActivePopoverEntry> = new Set();
-  private static globalListenersInitialized = false;
+  private static activeStack: ActivePopoverEntry[] = [];
 
-  private static initGlobalListeners(): void {
-    if (this.globalListenersInitialized) return;
-    this.globalListenersInitialized = true;
-
-    // Close popovers if window loses focus
-    window.addEventListener("blur", () => {
-      this.closeAll();
-    });
-
-    // Close on navigation/tab switch shortcuts or back/forward
-    window.addEventListener("popstate", () => {
-      this.closeAll();
-    });
-
-    // Close on visibility change (tab/window switch)
-    document.addEventListener("visibilitychange", () => {
-      if (document.hidden) {
-        this.closeAll();
-      }
-    });
+  /**
+   * Check if any popover is currently open, optionally within a specific root element.
+   */
+  static hasActivePopover(rootEl?: HTMLElement): boolean {
+    if (this.activeStack.length === 0) return false;
+    if (!rootEl) return true;
+    return this.activeStack.some((entry) => rootEl.contains(entry.anchor) || rootEl.contains(entry.el));
   }
 
   /**
    * Close and destroy all active popovers.
    */
-  static closeAll(): void {
-    const entries = Array.from(this.activeEntries);
-    this.activeEntries.clear();
-    for (const entry of entries) {
-      try {
-        entry.close();
-      } catch (e) {
-        // Safe ignore
+  static closeAll(container?: HTMLElement): void {
+    const list = [...this.activeStack];
+    for (let i = list.length - 1; i >= 0; i--) {
+      const entry = list[i];
+      if (!container || container.contains(entry.anchor) || container.contains(entry.el)) {
+        try {
+          entry.close();
+        } catch (e) {
+          // Safe ignore
+        }
       }
     }
-    // Safety cleanup: remove any lingering popover elements from document.body
-    document.querySelectorAll(".dbui-popover").forEach((el) => el.remove());
   }
 
   /**
-   * Create, position, and manage a new popover element.
+   * Create, position, and manage a new popover element with popout window and mobile support.
    */
   static createPopover(options: {
     anchor: HTMLElement;
@@ -63,14 +50,14 @@ export class PopoverManager {
     close: () => void;
     reposition: () => void;
   } {
-    this.initGlobalListeners();
+    const doc = options.anchor.ownerDocument || document;
+    const win = doc.defaultView || window;
 
     if (!options.allowNested) {
       this.closeAll();
     }
 
-    const popover = document.body.createDiv({ cls: `dbui-popover ${options.cls}` });
-
+    const popover = doc.body.createDiv({ cls: `dbui-popover ${options.cls}` });
     let isClosed = false;
 
     const close = () => {
@@ -78,18 +65,13 @@ export class PopoverManager {
       isClosed = true;
 
       // Unbind event listeners
-      document.removeEventListener("mousedown", onMouseDown, true);
-      document.removeEventListener("pointerdown", onMouseDown, true);
-      document.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("resize", onWindowResize);
+      doc.removeEventListener("pointerdown", onPointerDown, true);
+      doc.removeEventListener("keydown", onKeyDown, true);
+      win.removeEventListener("resize", onWindowResize);
       clearInterval(disconnectCheck);
 
-      // Remove from active list
-      for (const entry of Array.from(this.activeEntries)) {
-        if (entry.el === popover) {
-          this.activeEntries.delete(entry);
-        }
-      }
+      // Remove from active stack
+      this.activeStack = this.activeStack.filter((e) => e.el !== popover);
 
       // Remove element from DOM
       if (popover.parentElement) {
@@ -106,7 +88,7 @@ export class PopoverManager {
       }
     };
 
-    const onMouseDown = (evt: MouseEvent) => {
+    const onPointerDown = (evt: PointerEvent | MouseEvent) => {
       const target = evt.target as Node;
       if (popover.contains(target)) return;
       if (options.anchor && options.anchor.contains(target)) return;
@@ -120,24 +102,42 @@ export class PopoverManager {
 
     const onKeyDown = (evt: KeyboardEvent) => {
       if (evt.key === "Escape") {
-        evt.preventDefault();
-        evt.stopPropagation();
-        close();
+        // Only close the topmost popover in the stack
+        const top = PopoverManager.activeStack[PopoverManager.activeStack.length - 1];
+        if (top && top.el === popover) {
+          evt.preventDefault();
+          evt.stopImmediatePropagation();
+          close();
+        }
       }
     };
 
     const onWindowResize = () => {
+      // On mobile or tablets, soft keyboard popup triggers window resize
+      // If active focus is inside this popover, reposition instead of closing
+      const activeEl = doc.activeElement as HTMLElement | null;
+      if (activeEl && popover.contains(activeEl)) {
+        reposition();
+        return;
+      }
       close();
     };
 
-    document.addEventListener("mousedown", onMouseDown, true);
-    document.addEventListener("pointerdown", onMouseDown, true);
-    document.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("resize", onWindowResize);
+    doc.addEventListener("pointerdown", onPointerDown, true);
+    doc.addEventListener("keydown", onKeyDown, true);
+    win.addEventListener("resize", onWindowResize);
 
-    const disconnectCheck = window.setInterval(() => {
+    // Anchor disconnect check with short grace period
+    let disconnectedCount = 0;
+    const disconnectCheck = win.setInterval(() => {
       if (options.anchor && !options.anchor.isConnected) {
-        close();
+        disconnectedCount++;
+        // Give 2 ticks (400ms) for transient DOM re-attachments
+        if (disconnectedCount >= 2) {
+          close();
+        }
+      } else {
+        disconnectedCount = 0;
       }
     }, 200);
 
@@ -148,7 +148,7 @@ export class PopoverManager {
 
     reposition();
 
-    this.activeEntries.add({ el: popover, close });
+    this.activeStack.push({ el: popover, anchor: options.anchor, close });
 
     return {
       el: popover,

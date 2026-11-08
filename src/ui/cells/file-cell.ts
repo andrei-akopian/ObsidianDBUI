@@ -20,11 +20,12 @@ export class FileCell {
       text: row.basename,
     });
 
-    // Single click: open note
+    // Single click: open note safely via openFile
     nameSpan.addEventListener("click", async (evt) => {
       evt.stopPropagation();
       const inNewTab = evt.metaKey || evt.ctrlKey;
-      await app.workspace.openLinkText(row.path, "", inNewTab ? "tab" : false);
+      const leaf = app.workspace.getLeaf(inNewTab ? "tab" : false);
+      await leaf.openFile(row.file);
     });
 
     // Double click: rename
@@ -56,6 +57,11 @@ export class FileCell {
       const raw = input.value.trim();
       if (raw && raw !== currentName) {
         await onRename(raw);
+      } else {
+        wrapper.empty();
+        const iconSpan = wrapper.createSpan({ cls: "dbui-file-icon" });
+        setIcon(iconSpan, "file-text");
+        wrapper.createSpan({ cls: "dbui-file-name", text: currentName });
       }
     };
 

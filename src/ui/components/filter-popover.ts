@@ -106,9 +106,9 @@ export class FilterPopover {
       config.filters.forEach((filter, idx) => {
         const row = listContainer.createDiv({ cls: "dbui-filter-row" });
 
-        const currentCol = columns.find((c) => c.key === filter.key) || columns[0] || {
+        const currentCol = columns.find((c) => c.key === filter.key) || {
           key: filter.key,
-          name: filter.key,
+          name: `${filter.key} (missing)`,
           type: "text" as DataType,
           width: 160,
           visible: true,
@@ -116,6 +116,11 @@ export class FilterPopover {
 
         // 1. Column select
         const colSelect = row.createEl("select", { cls: "dbui-select dbui-filter-col-select" });
+        const hasMatchingCol = columns.some((c) => c.key === filter.key);
+        if (!hasMatchingCol) {
+          const opt = colSelect.createEl("option", { value: filter.key, text: `${filter.key} (missing)` });
+          opt.selected = true;
+        }
         for (const col of columns) {
           const opt = colSelect.createEl("option", { value: col.key, text: col.name });
           if (col.key === filter.key) opt.selected = true;
@@ -173,7 +178,7 @@ export class FilterPopover {
               cls: "dbui-select dbui-filter-val-input",
             });
             const options: StatusOption[] =
-              config.statusOptions[currentCol.key] || currentCol.options || [];
+              (config.statusOptions && config.statusOptions[currentCol.key]) || currentCol.options || [];
 
             statusSelect.createEl("option", { value: "", text: "-- Select status --" });
             for (const opt of options) {

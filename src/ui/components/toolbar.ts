@@ -7,20 +7,13 @@ import { FolderSuggestModal } from "./folder-suggest-modal";
 import { SortPopover } from "./sort-popover";
 
 export class TableToolbar {
-  private static searchInputEl: HTMLInputElement | null = null;
-
   static focusSearch(container?: HTMLElement): void {
     if (container) {
       const input = container.querySelector(".dbui-search-input") as HTMLInputElement;
       if (input) {
         input.focus();
         input.select();
-        return;
       }
-    }
-    if (this.searchInputEl && this.searchInputEl.isConnected) {
-      this.searchInputEl.focus();
-      this.searchInputEl.select();
     }
   }
 
@@ -29,6 +22,7 @@ export class TableToolbar {
     app: App,
     config: DBConfig,
     discoveredProps: DiscoveredProperty[],
+    quickSearch: string,
     onSearch: (query: string) => void,
     onFolderSelect: (folderPath: string) => Promise<void>,
     onNewNote: () => Promise<void>,
@@ -67,12 +61,14 @@ export class TableToolbar {
       type: "text",
       cls: "dbui-search-input",
       placeholder: "Search... (/)",
+      value: quickSearch || "",
     });
-    this.searchInputEl = searchInput;
 
     const clearBtn = searchWrap.createSpan({ cls: "dbui-search-clear" });
     setIcon(clearBtn, "x");
-    clearBtn.style.display = "none";
+    const hasInitialVal = Boolean(quickSearch && quickSearch.length > 0);
+    clearBtn.style.display = hasInitialVal ? "flex" : "none";
+    searchWrap.toggleClass("has-query", hasInitialVal);
     clearBtn.setAttribute("title", "Clear search");
 
     const updateClearBtn = () => {

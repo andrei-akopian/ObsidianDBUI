@@ -3,6 +3,7 @@ import { ColumnConfig, DataType, RowData } from "../types";
 import { parseDate } from "../utils/date-utils";
 import { normalizeTag } from "../utils/string-utils";
 import { FrontmatterManager } from "./frontmatter-manager";
+import { toNumeric } from "./value-processor";
 
 export interface DiscoveredProperty {
   key: string;
@@ -19,29 +20,16 @@ export class VaultScanner {
   }
 
   /**
-   * Get all folders in the vault.
-   */
-  getAllFolders(): { path: string; name: string }[] {
-    const folders: { path: string; name: string }[] = [];
-    const files = this.app.vault.getAllLoadedFiles();
-    folders.push({ path: "", name: "/ (Vault Root)" });
-    for (const f of files) {
-      if (f instanceof TFolder && f.path) {
-        folders.push({ path: f.path, name: f.path });
-      }
-    }
-    folders.sort((a, b) => a.name.localeCompare(b.name));
-    return folders;
-  }
-
-  /**
-   * Get all markdown files in a folder.
+   * Get all markdown files in a folder, safely handling root path and subfolders.
    */
   getNotesInFolder(folderPath: string, includeSubfolders = true): TFile[] {
-    const targetPath = folderPath.trim();
+    const targetPath = folderPath ? folderPath.trim().replace(/^\/+|\/+$/g, "") : "";
     const files = this.app.vault.getMarkdownFiles();
+
     return files.filter((file) => {
-      const parentPath = file.parent ? file.parent.path : "";
+      const rawParent = file.parent ? file.parent.path : "";
+      const parentPath = rawParent === "/" ? "" : rawParent.replace(/^\/+|\/+$/g, "");
+
       if (!targetPath) {
         return includeSubfolders ? true : parentPath === "";
       }
@@ -56,7 +44,7 @@ export class VaultScanner {
   }
 
   /**
-   * Build RowData list from files with optimistic cache awareness.
+   * Build RowData list from files with case-resilient property mapping and optimistic cache.
    */
   buildRows(files: TFile[]): RowData[] {
     return files.map((file) => {
@@ -72,7 +60,7 @@ export class VaultScanner {
           const opt = FrontmatterManager.getOptimisticValue(file.path, k);
           const val = opt.has ? opt.value : v;
           values[k] = val;
-          // Also set normalized lowercase key for resilient lookup
+          // Store lowercase key for case-insensitive lookup
           values[k.toLowerCase()] = val;
         }
       }
@@ -90,32 +78,37 @@ export class VaultScanner {
    * Get all unique properties present across notes in the folder.
    */
   getDiscoveredPropertiesInFolder(rows: RowData[]): DiscoveredProperty[] {
-    const map = new Map<string, { type: DataType; count: number }>();
+    const map = new Map<string, { key: string; values: any[]; count: number }>();
 
     for (const row of rows) {
       for (const [rawKey, val] of Object.entries(row.values)) {
-        if (rawKey === "position" || rawKey === "file.name") continue;
-        const key = rawKey.toLowerCase();
+        if (rawKey === "position" || rawKey.toLowerCase() === "file.name") continue;
+        const lowerKey = rawKey.toLowerCase();
         if (val !== undefined && val !== null && val !== "") {
-          const existing = map.get(key);
+          const existing = map.get(lowerKey);
           if (!existing) {
-            map.set(key, {
-              type: this.inferDataType(val, key),
+            map.set(lowerKey, {
+              key: rawKey,
+              values: [val],
               count: 1,
             });
           } else {
             existing.count++;
+            if (existing.values.length < 20) {
+              existing.values.push(val);
+            }
           }
         }
       }
     }
 
     const result: DiscoveredProperty[] = [];
-    for (const [key, info] of map.entries()) {
+    for (const [lowerKey, info] of map.entries()) {
+      const inferredType = this.inferMajorityType(info.values, info.key);
       result.push({
-        key,
-        name: this.formatKeyToDisplayName(key),
-        type: info.type,
+        key: info.key,
+        name: this.formatKeyToDisplayName(info.key),
+        type: inferredType,
         count: info.count,
       });
     }
@@ -124,13 +117,16 @@ export class VaultScanner {
   }
 
   /**
-   * Auto-discover properties across all notes in the folder and infer their types.
+   * Auto-discover properties across notes, strictly respecting removed keys.
    */
   discoverColumns(
     rows: RowData[],
-    existingColumns: ColumnConfig[]
+    existingColumns: ColumnConfig[],
+    removedKeys: string[] = []
   ): ColumnConfig[] {
     const columnMap = new Map<string, ColumnConfig>();
+    const removedSet = new Set(removedKeys.map((k) => k.toLowerCase()));
+
     for (const col of existingColumns) {
       columnMap.set(col.key.toLowerCase(), { ...col });
     }
@@ -147,24 +143,41 @@ export class VaultScanner {
       });
     }
 
-    // Scan all rows for unique frontmatter keys
+    // Collect values per key to infer accurate types
+    const keySamples = new Map<string, { originalKey: string; samples: any[] }>();
+
     for (const row of rows) {
       for (const [key, val] of Object.entries(row.values)) {
         if (key === "position") continue;
         const lowerKey = key.toLowerCase();
-        if (!columnMap.has(lowerKey)) {
-          const inferredType = this.inferDataType(val, key);
-          columnMap.set(lowerKey, {
-            key,
-            name: this.formatKeyToDisplayName(key),
-            type: inferredType,
-            width: inferredType === "checkbox" ? 80 : 160,
-            visible: true,
-            wrap: false,
-            numberFormat: inferredType === "number" ? "plain" : undefined,
-            dateFormat: inferredType === "date" ? "relative" : undefined,
-          });
+        if (!columnMap.has(lowerKey) && !removedSet.has(lowerKey)) {
+          if (!keySamples.has(lowerKey)) {
+            keySamples.set(lowerKey, { originalKey: key, samples: [] });
+          }
+          if (val !== null && val !== undefined && val !== "") {
+            const entry = keySamples.get(lowerKey)!;
+            if (entry.samples.length < 15) {
+              entry.samples.push(val);
+            }
+          }
         }
+      }
+    }
+
+    // Add newly discovered columns that were not removed
+    for (const [lowerKey, entry] of keySamples.entries()) {
+      if (!columnMap.has(lowerKey)) {
+        const inferredType = this.inferMajorityType(entry.samples, entry.originalKey);
+        columnMap.set(lowerKey, {
+          key: entry.originalKey,
+          name: this.formatKeyToDisplayName(entry.originalKey),
+          type: inferredType,
+          width: inferredType === "checkbox" ? 80 : 160,
+          visible: true,
+          wrap: false,
+          numberFormat: inferredType === "number" ? "plain" : undefined,
+          dateFormat: inferredType === "date" ? "relative" : undefined,
+        });
       }
     }
 
@@ -191,15 +204,54 @@ export class VaultScanner {
   }
 
   /**
-   * Infer data type from sample value and key name.
+   * Infer type by examining the majority of sampled non-empty values.
+   */
+  private inferMajorityType(samples: any[], key: string): DataType {
+    const typeVotes = new Map<DataType, number>();
+    for (const val of samples) {
+      const t = this.inferDataType(val, key);
+      typeVotes.set(t, (typeVotes.get(t) || 0) + 1);
+    }
+
+    let bestType: DataType = "text";
+    let bestVotes = 0;
+    for (const [t, count] of typeVotes.entries()) {
+      if (count > bestVotes) {
+        bestVotes = count;
+        bestType = t;
+      }
+    }
+
+    return bestType;
+  }
+
+  /**
+   * Infer data type from sample value and key name using strict rules and whole word boundaries.
    */
   inferDataType(val: any, key: string): DataType {
     const lowerKey = key.toLowerCase();
+
+    // Check Obsidian's metadataTypeManager if available
+    const appAny = this.app as any;
+    if (appAny.metadataTypeManager?.getPropertyType) {
+      const obsidianType = appAny.metadataTypeManager.getPropertyType(lowerKey);
+      if (obsidianType === "checkbox") return "checkbox";
+      if (obsidianType === "number") return "number";
+      if (obsidianType === "date") return "date";
+      if (obsidianType === "datetime") return "time";
+      if (obsidianType === "tags" || obsidianType === "multitext") return "multi-tag";
+      if (obsidianType === "text") return "text";
+    }
+
     if (lowerKey === "status") return "status";
-    if (lowerKey.includes("tag") || lowerKey.includes("genre") || lowerKey.includes("category")) {
+
+    // Whole-word matching for tags
+    if (/(?:^|[_\s-])(tags?|genre|genres|category|categories)(?:$|[_\s-])/i.test(key)) {
       return "multi-tag";
     }
-    if (lowerKey.includes("date") || lowerKey.includes("created") || lowerKey.includes("deadline")) {
+
+    // Whole-word matching for dates (avoiding 'candidate', 'created_by')
+    if (/(?:^|[_\s-])(date|deadline|due|published|created_at|updated_at)(?:$|[_\s-])/i.test(key)) {
       return "date";
     }
 
@@ -207,12 +259,14 @@ export class VaultScanner {
     if (typeof val === "boolean") return "checkbox";
     if (typeof val === "number") return "number";
     if (Array.isArray(val)) return "multi-tag";
+
     if (typeof val === "string") {
       const trimmed = val.trim();
-      if (trimmed === "true" || trimmed === "false") return "checkbox";
-      if (!isNaN(Number(trimmed)) && trimmed !== "") return "number";
-      if (parseDate(trimmed)) return "date";
+      if (trimmed.toLowerCase() === "true" || trimmed.toLowerCase() === "false") return "checkbox";
+      if (toNumeric(trimmed) !== null) return "number";
+      if (parseDate(trimmed) !== null) return "date";
     }
+
     return "text";
   }
 

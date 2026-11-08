@@ -66,6 +66,10 @@ export class ColumnsPopover {
           removeBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             config.columns = config.columns.filter((c) => c.key !== col.key);
+            config.removedKeys = config.removedKeys || [];
+            if (!config.removedKeys.includes(col.key.toLowerCase())) {
+              config.removedKeys.push(col.key.toLowerCase());
+            }
             await onConfigChange();
             renderContent();
             reposition();
@@ -113,6 +117,11 @@ export class ColumnsPopover {
               dateFormat: prop.type === "date" ? "relative" : undefined,
             };
             config.columns.push(newCol);
+            if (config.removedKeys) {
+              config.removedKeys = config.removedKeys.filter(
+                (k) => k.toLowerCase() !== prop.key.toLowerCase()
+              );
+            }
             await onConfigChange();
             renderContent();
             reposition();

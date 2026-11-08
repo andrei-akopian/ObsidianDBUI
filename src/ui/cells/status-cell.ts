@@ -46,7 +46,16 @@ export class StatusCell {
     onSaveStatusOptions: (options: StatusOption[]) => Promise<void>
   ): void {
     let currentStatus = initialStatus;
-    const existingOptions: StatusOption[] = statusOptionsMap[column.key] || column.options || [];
+    const existingOptions: StatusOption[] = [...(statusOptionsMap[column.key] || column.options || [])];
+
+    // If note has an existing status value not in configured options, add it
+    if (initialStatus && !existingOptions.some((o) => o.label.toLowerCase() === initialStatus.toLowerCase())) {
+      existingOptions.push({
+        id: `existing-${Date.now()}`,
+        label: initialStatus,
+        color: "",
+      });
+    }
 
     const { el: popover, close, reposition } = PopoverManager.createPopover({
       anchor,
@@ -139,6 +148,7 @@ export class StatusCell {
           e.stopPropagation();
           this.openColorMenu(colorBtn, opt.label, tagColors, async (newColor) => {
             tagColors[opt.label] = newColor;
+            await onSaveStatusOptions(existingOptions);
             renderList(searchInput.value);
           });
         });

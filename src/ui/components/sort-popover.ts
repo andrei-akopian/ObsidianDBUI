@@ -75,9 +75,9 @@ export class SortPopover {
       config.sort.forEach((sort, idx) => {
         const row = listContainer.createDiv({ cls: "dbui-sort-row" });
 
-        const currentCol = columns.find((c) => c.key === sort.key) || columns[0] || {
+        const currentCol = columns.find((c) => c.key === sort.key) || {
           key: sort.key,
-          name: sort.key,
+          name: `${sort.key} (missing)`,
           type: "text" as DataType,
           width: 160,
           visible: true,
@@ -85,6 +85,11 @@ export class SortPopover {
 
         // 1. Column select
         const colSelect = row.createEl("select", { cls: "dbui-select dbui-sort-col-select" });
+        const hasMatchingCol = columns.some((c) => c.key === sort.key);
+        if (!hasMatchingCol) {
+          const opt = colSelect.createEl("option", { value: sort.key, text: `${sort.key} (missing)` });
+          opt.selected = true;
+        }
         for (const col of columns) {
           const opt = colSelect.createEl("option", { value: col.key, text: col.name });
           if (col.key === sort.key) opt.selected = true;

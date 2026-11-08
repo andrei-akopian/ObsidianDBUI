@@ -49,7 +49,9 @@ export type FilterOperator =
   | "is-not-empty"
   | "is-today"
   | "is-past"
-  | "is-future";
+  | "is-future"
+  | "is-checked"
+  | "is-unchecked";
 
 export interface FilterRule {
   id: string;
@@ -78,6 +80,7 @@ export interface ViewSettings {
 }
 
 export interface DBConfig {
+  version?: number;
   folder: string;
   includeSubfolders: boolean;
   columns: ColumnConfig[];
@@ -86,6 +89,7 @@ export interface DBConfig {
   tagColors: Record<string, TagColor>;
   statusOptions: Record<string, StatusOption[]>;
   settings: ViewSettings;
+  removedKeys?: string[];
 }
 
 export interface RowData {

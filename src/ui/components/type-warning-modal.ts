@@ -1,5 +1,6 @@
 import { App, Modal, setIcon } from "obsidian";
 import { DataType } from "../../types";
+import { parseDate } from "../../utils/date-utils";
 
 export interface TypeCompatibilityCheck {
   incompatible: boolean;
@@ -79,7 +80,7 @@ export function checkTypeCompatibility(
     const hasNonDate = affected.some((a) => {
       if (Array.isArray(a.sampleValue)) return true;
       const str = String(a.sampleValue).trim();
-      const isDate = /^\d{4}-\d{2}-\d{2}/.test(str) || !isNaN(Date.parse(str));
+      const isDate = parseDate(str) !== null;
       return !isDate;
     });
     if (hasNonDate) {

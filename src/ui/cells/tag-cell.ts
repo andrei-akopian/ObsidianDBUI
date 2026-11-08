@@ -19,13 +19,16 @@ export class TagCell {
 
     if (Array.isArray(rawVal)) {
       for (const item of rawVal) {
-        if (typeof item === "string") {
-          const t = normalizeTag(item);
+        if (item !== null && item !== undefined && item !== "") {
+          const t = normalizeTag(String(item));
           if (t) tags.push(t);
         }
       }
     } else if (typeof rawVal === "string") {
-      const t = normalizeTag(rawVal);
+      const parts = rawVal.split(",").map((s) => normalizeTag(s)).filter(Boolean);
+      tags.push(...parts);
+    } else if (rawVal !== null && rawVal !== undefined && rawVal !== "") {
+      const t = normalizeTag(String(rawVal));
       if (t) tags.push(t);
     }
 
@@ -67,12 +70,52 @@ export class TagCell {
     onCommit: (newValue: any) => Promise<void>,
     onSaveTagColors: (colors: Record<string, TagColor>) => Promise<void>
   ): void {
+    let selectedTags = [...currentTags];
+    const isSingle = column.type === "tag";
+    let hasCommitted = false;
+
+    const updateCellVisuals = () => {
+      if (!anchor.isConnected) return;
+      anchor.empty();
+      const wrapper = anchor.createDiv({ cls: "dbui-tag-cell" });
+      if (selectedTags.length === 0) {
+        wrapper.createSpan({ cls: "dbui-cell-placeholder", text: "" });
+      } else {
+        for (const tag of selectedTags) {
+          const color = resolveTagColor(tag, tagColors);
+          const pill = wrapper.createDiv({ cls: "dbui-pill dbui-tag-pill" });
+          pill.style.backgroundColor = color.bg;
+          pill.style.color = color.text;
+          pill.createSpan({ text: tag });
+        }
+      }
+    };
+
+    const commitChanges = async () => {
+      if (hasCommitted) return;
+      // Check if tags actually changed
+      const changed =
+        selectedTags.length !== currentTags.length ||
+        selectedTags.some((t, i) => t !== currentTags[i]);
+      if (!changed) return;
+
+      hasCommitted = true;
+      if (isSingle) {
+        await onCommit(selectedTags[0] || null);
+      } else {
+        await onCommit(selectedTags.length > 0 ? selectedTags : null);
+      }
+    };
+
     const { el: popover, close, reposition } = PopoverManager.createPopover({
       anchor,
       cls: "dbui-tag-popover",
+      onClose: async () => {
+        if (!isSingle) {
+          await commitChanges();
+        }
+      },
     });
-
-    let selectedTags = [...currentTags];
 
     // Selected chips container
     const selectedWrapper = popover.createDiv({ cls: "dbui-tag-selected-wrap" });
@@ -82,7 +125,7 @@ export class TagCell {
     const searchInput = searchWrapper.createEl("input", {
       type: "text",
       cls: "dbui-popover-search-input",
-      placeholder: "Search or add tags...",
+      placeholder: isSingle ? "Select tag..." : "Search or add tags...",
     });
 
     // Suggestions list
@@ -108,20 +151,11 @@ export class TagCell {
         removeBtn.addEventListener("click", async (e) => {
           e.stopPropagation();
           selectedTags = selectedTags.filter((t) => t !== tag);
+          updateCellVisuals();
           renderSelected();
           renderList(searchInput.value);
           reposition();
-          await commitChanges();
         });
-      }
-    };
-
-    const commitChanges = async () => {
-      const isSingle = column.type === "tag";
-      if (isSingle) {
-        await onCommit(selectedTags[0] || null);
-      } else {
-        await onCommit(selectedTags.length > 0 ? selectedTags : null);
       }
     };
 
@@ -134,7 +168,7 @@ export class TagCell {
       const candidateSet = new Set<string>([...allVaultTags, ...selectedTags]);
       const candidates = Array.from(candidateSet);
 
-      // Filter and limit to top 50 for ultra fast UI responsiveness
+      // Filter and limit to top 50 for fast responsiveness
       const matched: string[] = [];
       for (const tag of candidates) {
         if (!q || fuzzyMatch(q, tag)) {
@@ -153,12 +187,20 @@ export class TagCell {
         createItem.addEventListener("click", async () => {
           const newTag = normalizeTag(filter);
           if (newTag && !selectedTags.includes(newTag)) {
-            selectedTags.push(newTag);
+            if (isSingle) {
+              selectedTags = [newTag];
+              updateCellVisuals();
+              await commitChanges();
+              close();
+              return;
+            } else {
+              selectedTags.push(newTag);
+            }
             searchInput.value = "";
+            updateCellVisuals();
             renderSelected();
             renderList("");
             reposition();
-            await commitChanges();
           }
         });
       }
@@ -189,13 +231,13 @@ export class TagCell {
           this.openColorPicker(colorBtn, tag, tagColors, async (newColor) => {
             tagColors[tag] = newColor;
             await onSaveTagColors(tagColors);
+            updateCellVisuals();
             renderSelected();
             renderList(searchInput.value);
           });
         });
 
         item.addEventListener("click", async () => {
-          const isSingle = column.type === "tag";
           if (isSelected) {
             selectedTags = selectedTags.filter((t) => t !== tag);
           } else {
@@ -206,12 +248,14 @@ export class TagCell {
             }
           }
           searchInput.value = "";
-          renderSelected();
-          renderList("");
-          reposition();
-          await commitChanges();
+          updateCellVisuals();
           if (isSingle) {
+            await commitChanges();
             close();
+          } else {
+            renderSelected();
+            renderList("");
+            reposition();
           }
         });
       }
@@ -228,84 +272,65 @@ export class TagCell {
     });
 
     searchInput.addEventListener("keydown", async (evt) => {
-      const items = listContainer.querySelectorAll(".dbui-popover-item");
+      const items = listContainer.querySelectorAll<HTMLElement>(".dbui-popover-item");
       if (evt.key === "ArrowDown") {
         evt.preventDefault();
-        activeIndex = Math.min(items.length - 1, activeIndex + 1);
-        updateActiveItem(items);
+        if (items.length > 0) {
+          activeIndex = (activeIndex + 1) % items.length;
+          items.forEach((it, idx) => it.toggleClass("is-active", idx === activeIndex));
+          items[activeIndex]?.scrollIntoView({ block: "nearest" });
+        }
       } else if (evt.key === "ArrowUp") {
         evt.preventDefault();
-        activeIndex = Math.max(0, activeIndex - 1);
-        updateActiveItem(items);
+        if (items.length > 0) {
+          activeIndex = (activeIndex - 1 + items.length) % items.length;
+          items.forEach((it, idx) => it.toggleClass("is-active", idx === activeIndex));
+          items[activeIndex]?.scrollIntoView({ block: "nearest" });
+        }
       } else if (evt.key === "Enter") {
         evt.preventDefault();
-        if (activeIndex >= 0 && activeIndex < items.length) {
-          (items[activeIndex] as HTMLElement).click();
+        if (activeIndex >= 0 && items[activeIndex]) {
+          items[activeIndex].click();
         } else if (searchInput.value.trim()) {
-          const newTag = normalizeTag(searchInput.value);
-          if (newTag && !selectedTags.includes(newTag)) {
-            selectedTags.push(newTag);
-            searchInput.value = "";
-            renderSelected();
-            renderList("");
-            reposition();
-            await commitChanges();
-          }
+          const createBtn = listContainer.querySelector<HTMLElement>(".dbui-create-item");
+          if (createBtn) createBtn.click();
         }
-      } else if (evt.key === "Backspace" && !searchInput.value && selectedTags.length > 0) {
-        selectedTags.pop();
-        renderSelected();
-        renderList("");
-        reposition();
-        await commitChanges();
       }
     });
-
-    const updateActiveItem = (items: NodeListOf<Element>) => {
-      items.forEach((it, idx) => {
-        if (idx === activeIndex) {
-          it.addClass("is-focused");
-          (it as HTMLElement).scrollIntoView({ block: "nearest" });
-        } else {
-          it.removeClass("is-focused");
-        }
-      });
-    };
   }
 
   static openColorPicker(
     anchor: HTMLElement,
     tag: string,
     tagColors: Record<string, TagColor>,
-    onSelectColor: (color: TagColor) => Promise<void>
+    onSelect: (color: TagColor) => Promise<void>
   ): void {
-    const { el: colorMenu, close, reposition } = PopoverManager.createPopover({
+    const { el: popover, close } = PopoverManager.createPopover({
       anchor,
       cls: "dbui-color-picker-popover",
       allowNested: true,
-      offset: 6,
     });
 
+    popover.createDiv({ cls: "dbui-color-picker-title", text: `Color for "${tag}"` });
+    const grid = popover.createDiv({ cls: "dbui-color-grid" });
+
     const isDark = document.body.classList.contains("theme-dark");
-    const grid = colorMenu.createDiv({ cls: "dbui-color-grid" });
 
     for (const preset of COLOR_PALETTE) {
+      const item = grid.createDiv({ cls: "dbui-color-item" });
       const bg = isDark ? preset.bgDark : preset.bgLight;
       const text = isDark ? preset.textDark : preset.textLight;
 
-      const cell = grid.createDiv({
-        cls: "dbui-color-swatch-cell",
-        attr: { title: preset.name },
-      });
-      cell.style.backgroundColor = text;
+      const swatch = item.createDiv({ cls: "dbui-color-swatch" });
+      swatch.style.backgroundColor = bg;
+      swatch.style.color = text;
+      swatch.createSpan({ text: preset.name });
 
-      cell.addEventListener("click", async (e) => {
+      item.addEventListener("click", async (e) => {
         e.stopPropagation();
         close();
-        await onSelectColor({ bg, text });
+        await onSelect({ bg, text });
       });
     }
-
-    reposition();
   }
 }

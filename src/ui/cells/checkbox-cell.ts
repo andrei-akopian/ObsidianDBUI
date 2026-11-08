@@ -1,3 +1,4 @@
+import { toBool } from "../../data/value-processor";
 import { ColumnConfig, RowData } from "../../types";
 
 export class CheckboxCell {
@@ -8,7 +9,7 @@ export class CheckboxCell {
     onCommit: (newValue: any) => Promise<void>
   ): void {
     const rawVal = row.values[column.key];
-    const isChecked = Boolean(rawVal);
+    const isChecked = toBool(rawVal);
 
     container.empty();
     const wrapper = container.createDiv({ cls: "dbui-checkbox-cell" });

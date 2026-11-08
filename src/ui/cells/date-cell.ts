@@ -63,12 +63,14 @@ export class DateCell {
 
       prevBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+        viewDate.setDate(1);
         viewDate.setMonth(viewDate.getMonth() - 1);
         renderCalendar();
       });
 
       nextBtn.addEventListener("click", (e) => {
         e.stopPropagation();
+        viewDate.setDate(1);
         viewDate.setMonth(viewDate.getMonth() + 1);
         renderCalendar();
       });

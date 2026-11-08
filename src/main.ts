@@ -1,5 +1,6 @@
 import {
   addIcon,
+  MarkdownRenderChild,
   Menu,
   normalizePath,
   Notice,
@@ -14,15 +15,28 @@ import {
   DBUI_FILE_EXTENSION,
   DBUI_ICON_ID,
   DBUI_ICON_SVG,
-  DEFAULT_DB_CONFIG,
   DEFAULT_SETTINGS,
   VIEW_TYPE_DBUI,
 } from "./constants";
+import { normalizeConfig } from "./data/config-manager";
 import { DBConfig, PluginSettings } from "./types";
 import { registerBasesViewIfAvailable } from "./ui/bases-adapter";
 import { DBUIFileView } from "./ui/dbui-file-view";
 import { PopoverManager } from "./ui/popover-manager";
 import { DBTableView } from "./ui/table-view";
+
+class DBUIRenderChild extends MarkdownRenderChild {
+  private tableView: DBTableView;
+
+  constructor(containerEl: HTMLElement, tableView: DBTableView) {
+    super(containerEl);
+    this.tableView = tableView;
+  }
+
+  onunload(): void {
+    this.tableView.destroy();
+  }
+}
 
 export default class DBUIPlugin extends Plugin {
   settings: PluginSettings = DEFAULT_SETTINGS;
@@ -43,55 +57,84 @@ export default class DBUIPlugin extends Plugin {
     this.registerMarkdownCodeBlockProcessor(
       DBUI_CODEBLOCK,
       async (source, el, ctx) => {
-        let config: DBConfig = JSON.parse(JSON.stringify(DEFAULT_DB_CONFIG));
-
         const trimmed = source.trim();
+        let targetDbuiFile: TFile | null = null;
+        let config: DBConfig;
+
         if (trimmed) {
+          let parsed: any;
           try {
-            // Check if YAML or JSON
-            let parsed: any;
             if (trimmed.startsWith("{")) {
               parsed = JSON.parse(trimmed);
             } else {
               parsed = parseYaml(trimmed);
             }
+          } catch (err: any) {
+            el.empty();
+            const errorCallout = el.createDiv({ cls: "callout callout-error" });
+            errorCallout.createDiv({ cls: "callout-title", text: "DB UI: Invalid Codeblock Configuration" });
+            errorCallout.createDiv({ cls: "callout-content", text: `Syntax error: ${err.message}` });
+            return;
+          }
 
-            if (parsed && typeof parsed === "object") {
-              // If referencing a .dbui file: `file: "ReadingList.dbui"`
-              if (parsed.file) {
-                const targetFile = this.app.vault.getFileByPath(parsed.file);
-                if (targetFile) {
-                  const content = await this.app.vault.read(targetFile);
-                  config = Object.assign({}, DEFAULT_DB_CONFIG, JSON.parse(content));
+          if (parsed && typeof parsed === "object") {
+            if (parsed.file) {
+              const dest = this.app.metadataCache.getFirstLinkpathDest(parsed.file, ctx.sourcePath);
+              targetDbuiFile = dest instanceof TFile ? dest : this.app.vault.getFileByPath(parsed.file);
+              if (targetDbuiFile) {
+                try {
+                  const content = await this.app.vault.read(targetDbuiFile);
+                  config = normalizeConfig(JSON.parse(content));
+                } catch (readErr: any) {
+                  el.empty();
+                  const errorCallout = el.createDiv({ cls: "callout callout-error" });
+                  errorCallout.createDiv({ cls: "callout-title", text: "DB UI: Could not read referenced file" });
+                  errorCallout.createDiv({ cls: "callout-content", text: `Error reading "${parsed.file}": ${readErr.message}` });
+                  return;
                 }
               } else {
-                config = Object.assign({}, DEFAULT_DB_CONFIG, parsed);
+                el.empty();
+                const errorCallout = el.createDiv({ cls: "callout callout-error" });
+                errorCallout.createDiv({ cls: "callout-title", text: "DB UI: File Not Found" });
+                errorCallout.createDiv({ cls: "callout-content", text: `Could not resolve referenced database file: "${parsed.file}"` });
+                return;
               }
+            } else {
+              config = normalizeConfig(parsed);
             }
-          } catch (err) {
-            console.error("[DBUI] Error parsing codeblock config:", err);
+          } else {
+            el.empty();
+            const errorCallout = el.createDiv({ cls: "callout callout-error" });
+            errorCallout.createDiv({ cls: "callout-title", text: "DB UI: Invalid Configuration" });
+            errorCallout.createDiv({ cls: "callout-content", text: "Codeblock must contain a YAML or JSON object." });
+            return;
           }
         } else {
-          // Default to folder of the current file
+          // Default to folder of the current note
           const currentFile = this.app.vault.getFileByPath(ctx.sourcePath);
-          if (currentFile && currentFile.parent) {
-            config.folder = currentFile.parent.path;
-          }
+          const currentFolder = currentFile?.parent ? currentFile.parent.path : "";
+          config = normalizeConfig({ folder: currentFolder });
         }
 
-        const tableView = new DBTableView(this.app, el, config, null, async (newCfg) => {
-          // If codeblock references a file, save there
-        });
+        const tableView = new DBTableView(
+          this.app,
+          el,
+          config,
+          targetDbuiFile,
+          async (newCfg) => {
+            if (targetDbuiFile) {
+              try {
+                await this.app.vault.modify(targetDbuiFile, JSON.stringify(newCfg, null, 2));
+              } catch (err) {
+                console.error("[DBUI] Error saving to referenced database file:", err);
+              }
+            }
+          }
+        );
         await tableView.load();
 
-        // Clean up when codeblock is unloaded
-        ctx.addChild({
-          onload() {},
-          onunload() {
-            tableView.destroy();
-          },
-          containerEl: el,
-        } as any);
+        const child = new DBUIRenderChild(el, tableView);
+        ctx.addChild(child);
       }
     );
 
@@ -120,11 +163,10 @@ export default class DBUIPlugin extends Plugin {
     this.addCommand({
       id: "focus-dbui-search",
       name: "Search active database table",
-      hotkeys: [{ modifiers: [], key: "/" }],
       checkCallback: (checking: boolean) => {
-        const activeLeaf = this.app.workspace.activeLeaf;
-        if (activeLeaf && activeLeaf.view) {
-          const searchInput = activeLeaf.view.containerEl.querySelector(".dbui-search-input") as HTMLInputElement;
+        const activeView = this.app.workspace.getActiveViewOfType(DBUIFileView);
+        if (activeView) {
+          const searchInput = activeView.containerEl.querySelector(".dbui-search-input") as HTMLInputElement;
           if (searchInput) {
             if (!checking) {
               searchInput.focus();
@@ -152,6 +194,7 @@ export default class DBUIPlugin extends Plugin {
         }
       })
     );
+
     // 8. Close floating menus/popovers on tab or layout change
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", () => {
@@ -180,7 +223,7 @@ export default class DBUIPlugin extends Plugin {
       );
     }
 
-    const initialConfig: DBConfig = Object.assign({}, DEFAULT_DB_CONFIG, {
+    const initialConfig = normalizeConfig({
       folder: folderPath,
       includeSubfolders: true,
     });

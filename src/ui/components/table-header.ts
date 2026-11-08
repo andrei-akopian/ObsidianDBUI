@@ -10,7 +10,7 @@ export class TableHeader {
     thead: HTMLTableSectionElement,
     columns: ColumnConfig[],
     config: DBConfig,
-    rows: RowData[],
+    allRows: RowData[],
     discoveredProps: DiscoveredProperty[],
     app: App,
     frontmatterManager: FrontmatterManager,
@@ -47,7 +47,7 @@ export class TableHeader {
       contentWrap.createSpan({ cls: "dbui-th-name", text: column.name });
 
       // Sort indicator
-      const activeSort = config.sort.find((s) => s.key === column.key);
+      const activeSort = config.sort.find((s) => s.key === column.key || s.key.toLowerCase() === column.key.toLowerCase());
       if (activeSort) {
         contentWrap.createSpan({
           cls: "dbui-th-sort-indicator",
@@ -66,7 +66,7 @@ export class TableHeader {
           th,
           column,
           config,
-          rows,
+          allRows,
           app,
           frontmatterManager,
           onConfigChange,
@@ -98,7 +98,9 @@ export class TableHeader {
       th.addEventListener("dragend", () => {
         draggedColKey = null;
         th.removeClass("is-dragging");
-        tr.querySelectorAll(".dbui-th").forEach((el) => el.removeClass("is-drag-over"));
+        thead.querySelectorAll(".dbui-th").forEach((el) => {
+          el.removeClass("is-drag-over");
+        });
       });
 
       th.addEventListener("dragover", (evt) => {
@@ -116,36 +118,40 @@ export class TableHeader {
       th.addEventListener("drop", async (evt) => {
         evt.preventDefault();
         th.removeClass("is-drag-over");
-        const sourceKey = draggedColKey || (evt.dataTransfer ? evt.dataTransfer.getData("text/plain") : null);
-        const targetKey = column.key;
+        const sourceKey = evt.dataTransfer?.getData("text/plain") || draggedColKey;
+        if (!sourceKey || sourceKey === column.key) return;
 
-        if (sourceKey && targetKey && sourceKey !== targetKey) {
-          const fromIdx = config.columns.findIndex((c) => c.key === sourceKey);
-          const toIdx = config.columns.findIndex((c) => c.key === targetKey);
+        const fromIdx = config.columns.findIndex((c) => c.key === sourceKey);
+        const toIdx = config.columns.findIndex((c) => c.key === column.key);
 
-          if (fromIdx !== -1 && toIdx !== -1) {
-            const [moved] = config.columns.splice(fromIdx, 1);
-            config.columns.splice(toIdx, 0, moved);
-            await onConfigChange();
-            onDataUpdated();
-          }
+        if (fromIdx !== -1 && toIdx !== -1) {
+          const [moved] = config.columns.splice(fromIdx, 1);
+          config.columns.splice(toIdx, 0, moved);
+          await onConfigChange();
+          onDataUpdated();
         }
       });
 
-      // Resize Handle
-      const resizer = th.createDiv({ cls: "dbui-col-resizer" });
+      // Resize handle
+      const resizer = th.createDiv({ cls: "dbui-th-resizer" });
       this.attachResizer(resizer, th, column, onConfigChange);
     });
 
-    // 3. "+ Add property" Column Header
+    // 3. Rightmost sticky "+ Add column" header button
     const thAdd = tr.createEl("th", { cls: "dbui-th dbui-th-add-col" });
     const addColBtn = thAdd.createDiv({ cls: "dbui-add-col-btn" });
-    const addIcon = addColBtn.createSpan({ cls: "dbui-add-col-icon" });
-    setIcon(addIcon, "plus");
+    setIcon(addColBtn, "plus");
     addColBtn.createSpan({ text: "Add property" });
 
-    addColBtn.addEventListener("click", () => {
-      this.openAddColumnPopover(addColBtn, config, discoveredProps, onConfigChange, onDataUpdated);
+    addColBtn.addEventListener("click", (evt) => {
+      evt.stopPropagation();
+      this.openAddColumnPopover(
+        addColBtn,
+        config,
+        discoveredProps,
+        onConfigChange,
+        onDataUpdated
+      );
     });
   }
 
@@ -181,7 +187,7 @@ export class TableHeader {
   }
 
   private static cycleSort(key: string, config: DBConfig): void {
-    const existingIdx = config.sort.findIndex((s) => s.key === key);
+    const existingIdx = config.sort.findIndex((s) => s.key === key || s.key.toLowerCase() === key.toLowerCase());
     if (existingIdx === -1) {
       config.sort = [{ key, direction: "asc" }];
     } else if (config.sort[existingIdx].direction === "asc") {
@@ -197,34 +203,51 @@ export class TableHeader {
     column: ColumnConfig,
     onConfigChange: () => Promise<void>
   ): void {
-    resizer.addEventListener("mousedown", (evt) => {
+    resizer.addEventListener("pointerdown", (evt) => {
       evt.preventDefault();
       evt.stopPropagation();
+      resizer.setPointerCapture(evt.pointerId);
 
       const startX = evt.clientX;
       const startWidth = th.getBoundingClientRect().width;
       let newWidth = startWidth;
 
-      document.body.addClass("is-resizing-column");
+      const doc = th.ownerDocument || document;
+      doc.body.addClass("is-resizing-column");
 
-      const onMouseMove = (moveEvt: MouseEvent) => {
+      // Find matching column cells in tbody
+      const trParent = th.parentElement;
+      const colIndex = trParent ? Array.from(trParent.children).indexOf(th) : -1;
+      const table = th.closest("table");
+      const colTds = colIndex >= 0 && table
+        ? table.querySelectorAll<HTMLTableCellElement>(`tbody tr td:nth-child(${colIndex + 1})`)
+        : null;
+
+      const onPointerMove = (moveEvt: PointerEvent) => {
         const delta = moveEvt.clientX - startX;
         newWidth = Math.max(60, startWidth + delta);
         th.style.width = `${newWidth}px`;
         th.style.minWidth = `${newWidth}px`;
+        if (colTds) {
+          colTds.forEach((td) => {
+            td.style.width = `${newWidth}px`;
+            td.style.minWidth = `${newWidth}px`;
+          });
+        }
       };
 
-      const onMouseUp = async () => {
-        document.body.removeClass("is-resizing-column");
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
+      const onPointerUp = async (upEvt: PointerEvent) => {
+        resizer.releasePointerCapture(upEvt.pointerId);
+        doc.body.removeClass("is-resizing-column");
+        resizer.removeEventListener("pointermove", onPointerMove);
+        resizer.removeEventListener("pointerup", onPointerUp);
 
         column.width = Math.round(newWidth);
         await onConfigChange();
       };
 
-      document.addEventListener("mousemove", onMouseMove);
-      document.addEventListener("mouseup", onMouseUp);
+      resizer.addEventListener("pointermove", onPointerMove);
+      resizer.addEventListener("pointerup", onPointerUp);
     });
   }
 
@@ -249,16 +272,15 @@ export class TableHeader {
     );
 
     if (availableProps.length > 0) {
-      const availWrap = popover.createDiv({ cls: "dbui-avail-add-section" });
-      availWrap.createDiv({ cls: "dbui-menu-label", text: "Existing in notes" });
+      popover.createDiv({ cls: "dbui-popover-subtitle", text: "From Notes" });
+      const list = popover.createDiv({ cls: "dbui-add-prop-list" });
 
-      const availList = availWrap.createDiv({ cls: "dbui-popover-list" });
       for (const prop of availableProps) {
-        const item = availList.createDiv({ cls: "dbui-popover-item" });
-        const nameSpan = item.createSpan({ text: prop.name });
+        const item = list.createDiv({ cls: "dbui-add-prop-item" });
+        const nameSpan = item.createSpan({ cls: "dbui-add-prop-name", text: prop.name });
         item.createSpan({
-          cls: "dbui-avail-meta",
-          text: `(${prop.type} • ${prop.count})`,
+          cls: "dbui-add-prop-meta",
+          text: `(${prop.type} • ${prop.count} note${prop.count > 1 ? "s" : ""})`,
         });
 
         item.addEventListener("click", async () => {
@@ -273,18 +295,21 @@ export class TableHeader {
             dateFormat: prop.type === "date" ? "relative" : undefined,
           };
           config.columns.push(newCol);
+          if (config.removedKeys) {
+            config.removedKeys = config.removedKeys.filter(
+              (k) => k.toLowerCase() !== prop.key.toLowerCase()
+            );
+          }
           await onConfigChange();
           close();
           onDataUpdated();
         });
       }
-
-      popover.createDiv({ cls: "dbui-menu-divider" });
     }
 
     // 2. Create new property section
-    const newWrap = popover.createDiv({ cls: "dbui-new-prop-section" });
-    newWrap.createDiv({ cls: "dbui-menu-label", text: "Create new property" });
+    popover.createDiv({ cls: "dbui-popover-subtitle", text: "New Property" });
+    const newWrap = popover.createDiv({ cls: "dbui-add-new-wrap" });
 
     const input = newWrap.createEl("input", {
       type: "text",
@@ -312,13 +337,25 @@ export class TableHeader {
     const doCreate = async () => {
       const name = input.value.trim();
       if (!name) return;
-      const key = name.toLowerCase().replace(/\s+/g, "_");
+      let baseKey = name.toLowerCase().replace(/[\s\-_]+/g, "_").replace(/[^\w]/g, "");
+      if (!baseKey || baseKey === "file_name" || baseKey === "name") {
+        baseKey = "property";
+      }
+
+      let candidateKey = baseKey;
+      let suffix = 1;
+      while (
+        candidateKey.toLowerCase() === "file.name" ||
+        config.columns.some((c) => c.key.toLowerCase() === candidateKey.toLowerCase())
+      ) {
+        candidateKey = `${baseKey}_${suffix++}`;
+      }
 
       const newCol: ColumnConfig = {
-        key,
+        key: candidateKey,
         name,
         type: typeSelect.value as DataType,
-        width: 160,
+        width: typeSelect.value === "checkbox" ? 80 : 160,
         visible: true,
         wrap: false,
         numberFormat: typeSelect.value === "number" ? "plain" : undefined,
@@ -326,6 +363,11 @@ export class TableHeader {
       };
 
       config.columns.push(newCol);
+      if (config.removedKeys) {
+        config.removedKeys = config.removedKeys.filter(
+          (k) => k.toLowerCase() !== candidateKey.toLowerCase()
+        );
+      }
       await onConfigChange();
       close();
       onDataUpdated();

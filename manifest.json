@@ -2,7 +2,7 @@
   "id": "obsidian-db-ui",
   "name": "DB UI",
   "version": "1.0.0",
-  "minAppVersion": "1.4.0",
+  "minAppVersion": "1.5.7",
   "description": "A high-performance, minimalist database table view for Obsidian notes with folder sources, colored tags, progress indicators, status dropdowns, and rich inline editing.",
   "author": "Andrei",
   "authorUrl": "",

@@ -1,7 +1,51 @@
-import { App, Menu, setIcon } from "obsidian";
+import { App, Menu, Modal, setIcon, TFile } from "obsidian";
 import { FrontmatterManager } from "../../data/frontmatter-manager";
 import { ColumnConfig, DBConfig, RowData } from "../../types";
 import { CellRenderer } from "../cells/cell-renderer";
+
+export class ConfirmDeleteModal extends Modal {
+  private file: TFile;
+  private onConfirm: () => Promise<void>;
+
+  constructor(app: App, file: TFile, onConfirm: () => Promise<void>) {
+    super(app);
+    this.file = file;
+    this.onConfirm = onConfirm;
+  }
+
+  onOpen(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("dbui-confirm-modal");
+
+    contentEl.createEl("h3", { text: `Delete "${this.file.basename}"?` });
+    contentEl.createEl("p", {
+      text: "Are you sure you want to move this note to the trash? This action cannot be easily undone.",
+    });
+
+    const btnRow = contentEl.createDiv({ cls: "dbui-modal-button-row" });
+    btnRow.style.display = "flex";
+    btnRow.style.justifyContent = "flex-end";
+    btnRow.style.gap = "8px";
+    btnRow.style.marginTop = "16px";
+
+    const cancelBtn = btnRow.createEl("button", { text: "Cancel" });
+    cancelBtn.addEventListener("click", () => this.close());
+
+    const deleteBtn = btnRow.createEl("button", {
+      cls: "mod-warning",
+      text: "Delete",
+    });
+    deleteBtn.addEventListener("click", async () => {
+      this.close();
+      await this.onConfirm();
+    });
+  }
+
+  onClose(): void {
+    this.contentEl.empty();
+  }
+}
 
 export class TableBody {
   static render(
@@ -45,12 +89,11 @@ export class TableBody {
         this.showRowContextMenu(evt, row, app, frontmatterManager, onNewNote, onDataUpdated);
       });
 
-      // Data Cells with minimum and ideal width
+      // Data Cells (width governed by column/header)
       columns.forEach((column) => {
         const td = tr.createEl("td", { cls: "dbui-td" });
         const colWidth = column.width || 160;
         td.style.width = `${colWidth}px`;
-        td.style.minWidth = `${colWidth}px`;
 
         CellRenderer.renderCell(
           td,
@@ -119,7 +162,8 @@ export class TableBody {
         .setTitle("Open note")
         .setIcon("file-text")
         .onClick(async () => {
-          await app.workspace.openLinkText(row.path, "", false);
+          const leaf = app.workspace.getLeaf(false);
+          await leaf.openFile(row.file);
         });
     });
 
@@ -128,7 +172,8 @@ export class TableBody {
         .setTitle("Open in new tab")
         .setIcon("file-plus")
         .onClick(async () => {
-          await app.workspace.openLinkText(row.path, "", "tab");
+          const leaf = app.workspace.getLeaf("tab");
+          await leaf.openFile(row.file);
         });
     });
 
@@ -137,7 +182,8 @@ export class TableBody {
         .setTitle("Open in split")
         .setIcon("split")
         .onClick(async () => {
-          await app.workspace.openLinkText(row.path, "", "split");
+          const leaf = app.workspace.getLeaf("split");
+          await leaf.openFile(row.file);
         });
     });
 
@@ -148,11 +194,13 @@ export class TableBody {
         .setTitle("Delete note")
         .setIcon("trash-2")
         .setWarning(true)
-        .onClick(async () => {
-          const ok = await frontmatterManager.deleteNote(row.file);
-          if (ok) {
-            onDataUpdated();
-          }
+        .onClick(() => {
+          new ConfirmDeleteModal(app, row.file, async () => {
+            const ok = await frontmatterManager.deleteNote(row.file);
+            if (ok && onDataUpdated) {
+              onDataUpdated();
+            }
+          }).open();
         });
     });
 

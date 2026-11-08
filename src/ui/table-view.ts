@@ -1,5 +1,5 @@
-import { App, debounce, EventRef, Menu, Notice, TFile } from "obsidian";
-import { DEFAULT_DB_CONFIG } from "../constants";
+import { App, debounce, Debouncer, EventRef, Menu, Notice, TFile, TFolder } from "obsidian";
+import { normalizeConfig } from "../data/config-manager";
 import { FilterSorter } from "../data/filter-sorter";
 import { FrontmatterManager } from "../data/frontmatter-manager";
 import { DiscoveredProperty, VaultScanner } from "../data/vault-scanner";
@@ -19,13 +19,13 @@ export class DBTableView {
   private frontmatterManager: FrontmatterManager;
   private vaultScanner: VaultScanner;
 
-  private rootEl: HTMLElement;
-  private toolbarEl: HTMLElement;
-  private tableContainerEl: HTMLElement;
-  private tableEl: HTMLTableElement;
-  private theadEl: HTMLTableSectionElement;
-  private tbodyEl: HTMLTableSectionElement;
-  private emptyContainerEl: HTMLElement;
+  private rootEl!: HTMLElement;
+  private toolbarEl!: HTMLElement;
+  private tableContainerEl!: HTMLElement;
+  private tableEl!: HTMLTableElement;
+  private theadEl!: HTMLTableSectionElement;
+  private tbodyEl!: HTMLTableSectionElement;
+  private emptyContainerEl!: HTMLElement;
 
   private rawRows: RowData[] = [];
   private processedRows: RowData[] = [];
@@ -33,6 +33,7 @@ export class DBTableView {
   private allVaultTags: string[] = [];
   private quickSearch = "";
   private eventRefs: EventRef[] = [];
+  private debouncedRefresh!: Debouncer<[], void>;
 
   constructor(
     app: App,
@@ -43,7 +44,7 @@ export class DBTableView {
   ) {
     this.app = app;
     this.containerEl = containerEl;
-    this.config = initialConfig ? this.cloneConfig(initialConfig) : this.cloneConfig(DEFAULT_DB_CONFIG);
+    this.config = normalizeConfig(initialConfig);
     this.file = file || null;
     this.onSaveCallback = onSaveCallback;
 
@@ -52,10 +53,6 @@ export class DBTableView {
 
     this.buildDOM();
     this.registerVaultEvents();
-  }
-
-  private cloneConfig(cfg: DBConfig): DBConfig {
-    return JSON.parse(JSON.stringify(cfg));
   }
 
   private buildDOM(): void {
@@ -73,7 +70,7 @@ export class DBTableView {
     this.emptyContainerEl = this.tableContainerEl.createDiv({ cls: "dbui-empty-container" });
     this.emptyContainerEl.style.display = "none";
 
-    // Global '/' shortcut inside table view (focuses and selects search box)
+    // Global '/' shortcut inside table view (focuses search box)
     this.rootEl.addEventListener("keydown", (evt: KeyboardEvent) => {
       const target = evt.target as HTMLElement;
       const isInput =
@@ -108,16 +105,38 @@ export class DBTableView {
     });
   }
 
-  private registerVaultEvents(): void {
-    const debouncedRefresh = debounce(() => {
-      this.refreshData(false);
-    }, 200);
+  private isFileInSourceFolder(file: TFile): boolean {
+    const targetFolder = this.config.folder.trim().replace(/^\/+|\/+$/g, "");
+    const parentPath = file.parent ? file.parent.path.replace(/^\/+|\/+$/g, "") : "";
 
-    // Watch metadata changes
+    if (!targetFolder) {
+      return this.config.includeSubfolders !== false ? true : parentPath === "";
+    }
+    if (parentPath === targetFolder) return true;
+    if (this.config.includeSubfolders !== false && parentPath.startsWith(targetFolder + "/")) {
+      return true;
+    }
+    return false;
+  }
+
+  private registerVaultEvents(): void {
+    this.debouncedRefresh = debounce(() => {
+      // If user is currently editing or interacting with an open popover, defer refresh
+      if (
+        PopoverManager.hasActivePopover(this.rootEl) ||
+        (this.rootEl.contains(document.activeElement) &&
+          (document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA"))
+      ) {
+        return;
+      }
+      this.refreshData(false);
+    }, 250);
+
+    // Watch metadata changes strictly within the source folder
     this.eventRefs.push(
       this.app.metadataCache.on("changed", (changedFile) => {
-        if (changedFile.extension === "md") {
-          debouncedRefresh();
+        if (changedFile.extension === "md" && this.isFileInSourceFolder(changedFile)) {
+          this.debouncedRefresh();
         }
       })
     );
@@ -125,23 +144,45 @@ export class DBTableView {
     // Watch vault creation / deletion / rename
     this.eventRefs.push(
       this.app.vault.on("create", (f) => {
-        if (f instanceof TFile && f.extension === "md") debouncedRefresh();
+        if (f instanceof TFile && f.extension === "md" && this.isFileInSourceFolder(f)) {
+          this.debouncedRefresh();
+        }
       })
     );
     this.eventRefs.push(
       this.app.vault.on("delete", (f) => {
-        if (f instanceof TFile && f.extension === "md") debouncedRefresh();
+        if (f instanceof TFile && f.extension === "md" && this.isFileInSourceFolder(f)) {
+          this.debouncedRefresh();
+        }
       })
     );
     this.eventRefs.push(
-      this.app.vault.on("rename", (f) => {
-        if (f instanceof TFile && f.extension === "md") debouncedRefresh();
+      this.app.vault.on("rename", (f, oldPath) => {
+        // If the source folder itself was renamed
+        if (f instanceof TFolder) {
+          const normOld = oldPath.replace(/^\/+|\/+$/g, "");
+          const currentNorm = this.config.folder.replace(/^\/+|\/+$/g, "");
+          if (normOld && normOld === currentNorm) {
+            this.config.folder = f.path;
+            this.saveConfig();
+            this.refreshData(false);
+            return;
+          }
+        }
+        if (f instanceof TFile && f.extension === "md") {
+          if (this.isFileInSourceFolder(f) || oldPath.startsWith(this.config.folder)) {
+            this.debouncedRefresh();
+          }
+        }
       })
     );
   }
 
   destroy(): void {
-    PopoverManager.closeAll();
+    if (this.debouncedRefresh) {
+      this.debouncedRefresh.cancel();
+    }
+    PopoverManager.closeAll(this.rootEl);
     for (const ref of this.eventRefs) {
       this.app.metadataCache.offref(ref);
       this.app.vault.offref(ref);
@@ -172,13 +213,17 @@ export class DBTableView {
     );
     this.rawRows = this.vaultScanner.buildRows(notes);
 
-    // 2. Discover columns on initial load or folder change
+    // 2. Discover columns on initial load or folder change, respecting removedKeys
     if (discoverCols) {
+      const prevCount = this.config.columns.length;
       this.config.columns = this.vaultScanner.discoverColumns(
         this.rawRows,
-        this.config.columns
+        this.config.columns,
+        this.config.removedKeys || []
       );
-      await this.saveConfig();
+      if (this.config.columns.length !== prevCount) {
+        await this.saveConfig();
+      }
     }
 
     // 3. Track all discovered properties in folder
@@ -200,12 +245,13 @@ export class DBTableView {
     this.rootEl.toggleClass("is-wrap-cells", Boolean(this.config.settings.wrapCells));
     this.rootEl.toggleClass("is-search-active", Boolean(this.quickSearch && this.quickSearch.trim()));
 
-    // Render Toolbar
+    // Render Toolbar with quickSearch preserved
     TableToolbar.render(
       this.toolbarEl,
       this.app,
       this.config,
       this.discoveredProps,
+      this.quickSearch,
       (query) => {
         this.quickSearch = query;
         this.filterAndSortRows();
@@ -239,7 +285,7 @@ export class DBTableView {
       this.theadEl,
       visibleColumns,
       this.config,
-      this.processedRows,
+      this.rawRows, // pass rawRows so type checks cover all notes
       this.discoveredProps,
       this.app,
       this.frontmatterManager,
@@ -249,7 +295,7 @@ export class DBTableView {
       },
       () => {
         this.filterAndSortRows();
-        this.renderBody();
+        this.renderHeaderAndBody();
       }
     );
 
@@ -370,7 +416,7 @@ export class DBTableView {
       await this.refreshData(false);
       new Notice(`Created "${created.basename}".`);
 
-      // Scroll the user to the newly created note's location and highlight it
+      // Scroll to newly created note and highlight it
       setTimeout(() => {
         const targetRow = this.tbodyEl.querySelector(
           `tr[data-path="${CSS.escape(created.path)}"]`
@@ -403,7 +449,7 @@ export class DBTableView {
   }
 
   setConfig(newConfig: DBConfig): void {
-    this.config = this.cloneConfig(newConfig);
+    this.config = normalizeConfig(newConfig);
     this.refreshData(false);
   }
 

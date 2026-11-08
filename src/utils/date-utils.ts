@@ -1,32 +1,67 @@
 import { DateFormat } from "../types";
 
+/**
+ * Strict parser that only accepts ISO-like date strings:
+ * - YYYY-MM-DD
+ * - YYYY-MM-DDTHH:mm / YYYY-MM-DD HH:mm
+ * - YYYY-MM-DDTHH:mm:ss / YYYY-MM-DD HH:mm:ss
+ * - Optional 'Z' or '+/-HH:mm' timezone offset
+ *
+ * Does NOT accept arbitrary numbers or arbitrary strings like "Book 2", "5", "Chapter 1".
+ */
 export function parseDate(val: any): Date | null {
-  if (!val) return null;
+  if (val === null || val === undefined) return null;
   if (val instanceof Date) {
     return isNaN(val.getTime()) ? null : val;
   }
+  // Never treat plain numbers as dates in database properties
   if (typeof val === "number") {
-    const d = new Date(val);
-    return isNaN(d.getTime()) ? null : d;
+    return null;
   }
+
   if (typeof val === "string") {
     const trimmed = val.trim();
     if (!trimmed) return null;
-    // Handle standard YYYY-MM-DD
-    const isoMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?/);
-    if (isoMatch) {
-      const year = parseInt(isoMatch[1], 10);
-      const month = parseInt(isoMatch[2], 10) - 1;
-      const day = parseInt(isoMatch[3], 10);
-      const hour = isoMatch[4] ? parseInt(isoMatch[4], 10) : 0;
-      const minute = isoMatch[5] ? parseInt(isoMatch[5], 10) : 0;
-      const second = isoMatch[6] ? parseInt(isoMatch[6], 10) : 0;
-      const d = new Date(year, month, day, hour, minute, second);
+
+    // Strict regex matching: YYYY-MM-DD with optional time and optional timezone
+    const match = trimmed.match(
+      /^(\d{4})-(\d{2})-(\d{2})(?:[T\s](\d{2}):(\d{2})(?::(\d{2}))?)?(?:(Z)|([+-]\d{2}):?(\d{2})?)?$/i
+    );
+    if (!match) return null;
+
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+
+    // Validate calendar month and day ranges
+    if (month < 0 || month > 11 || day < 1 || day > 31) return null;
+
+    const hasTime = match[4] !== undefined;
+    const hour = hasTime ? parseInt(match[4], 10) : 0;
+    const minute = match[5] !== undefined ? parseInt(match[5], 10) : 0;
+    const second = match[6] !== undefined ? parseInt(match[6], 10) : 0;
+
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) return null;
+
+    // If timezone is present (e.g. Z or +02:00)
+    const hasTz = Boolean(match[7] || match[8]);
+    if (hasTz) {
+      const d = new Date(trimmed);
       return isNaN(d.getTime()) ? null : d;
     }
-    const d = new Date(trimmed);
-    return isNaN(d.getTime()) ? null : d;
+
+    // Local date construction to avoid unexpected UTC shifts when only date is provided
+    const d = new Date(year, month, day, hour, minute, second);
+    if (isNaN(d.getTime())) return null;
+
+    // Double check day didn't rollover (e.g. Feb 30 -> Mar 2)
+    if (d.getFullYear() !== year || d.getMonth() !== month || d.getDate() !== day) {
+      return null;
+    }
+
+    return d;
   }
+
   return null;
 }
 
@@ -65,8 +100,8 @@ export function formatAbsoluteDate(date: Date, includeTime = false): string {
   const month = pad(date.getMonth() + 1);
   const day = pad(date.getDate());
   let res = `${year}-${month}-${day}`;
-  if (includeTime && (date.getHours() !== 0 || date.getMinutes() !== 0)) {
-    res += ` ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  if (includeTime) {
+    res += `T${pad(date.getHours())}:${pad(date.getMinutes())}`;
   }
   return res;
 }

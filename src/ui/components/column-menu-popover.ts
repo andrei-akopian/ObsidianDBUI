@@ -276,6 +276,10 @@ export class ColumnMenuPopover {
       removeItem.setAttribute("title", "Removes from table columns. Property in notes is preserved.");
       removeItem.addEventListener("click", async () => {
         config.columns = config.columns.filter((c) => c.key !== column.key);
+        config.removedKeys = config.removedKeys || [];
+        if (!config.removedKeys.includes(column.key.toLowerCase())) {
+          config.removedKeys.push(column.key.toLowerCase());
+        }
         await onConfigChange();
         close();
         onDataUpdated();
