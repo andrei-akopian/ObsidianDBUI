@@ -4,5 +4,7 @@ rating: 1
 status: unfinished
 generes:
   - fiction
-  - truecrime
+  - true crime
+test: 2026-11-23
+date: 2026-11-10
 ---

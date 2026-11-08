@@ -1,0 +1,92 @@
+{
+  "folder": "ReadingList",
+  "includeSubfolders": true,
+  "columns": [
+    {
+      "key": "file.name",
+      "name": "Title",
+      "type": "file",
+      "width": 200,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "author",
+      "name": "Author",
+      "type": "text",
+      "width": 150,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "status",
+      "name": "Status",
+      "type": "tag",
+      "width": 130,
+      "visible": true,
+      "wrap": false,
+      "options": [
+        {
+          "id": "unfinished",
+          "label": "unfinished",
+          "color": ""
+        },
+        {
+          "id": "reading",
+          "label": "reading",
+          "color": ""
+        },
+        {
+          "id": "completed",
+          "label": "completed",
+          "color": ""
+        }
+      ]
+    },
+    {
+      "key": "rating",
+      "name": "Rating",
+      "type": "number",
+      "width": 140,
+      "visible": true,
+      "wrap": false,
+      "numberFormat": "progress-bar",
+      "numberMax": 5
+    },
+    {
+      "key": "generes",
+      "name": "Genres",
+      "type": "multi-tag",
+      "width": 200,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "test",
+      "name": "test",
+      "type": "date",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "dateFormat": "relative"
+    },
+    {
+      "key": "date",
+      "name": "Date",
+      "type": "date",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "dateFormat": "relative"
+    }
+  ],
+  "sort": [],
+  "filters": [],
+  "tagColors": {},
+  "statusOptions": {},
+  "settings": {
+    "wrapCells": false,
+    "rowDensity": "compact",
+    "showRowNumbers": true
+  }
+}

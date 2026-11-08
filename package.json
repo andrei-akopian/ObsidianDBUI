@@ -1,0 +1,26 @@
+{
+  "name": "obsidian-db-ui",
+  "version": "1.0.0",
+  "description": "Minimalist, feature-rich database table UI for Obsidian",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "database",
+    "table",
+    "notion",
+    "frontmatter"
+  ],
+  "author": "Andrei",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^22.13.1",
+    "esbuild": "^0.28.2",
+    "obsidian": "^1.14.4",
+    "typescript": "^5.7.3"
+  }
+}

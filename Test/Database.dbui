@@ -1,0 +1,74 @@
+{
+  "folder": "",
+  "includeSubfolders": true,
+  "columns": [
+    {
+      "key": "file.name",
+      "name": "Name",
+      "type": "file",
+      "width": 220,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "author",
+      "name": "Author",
+      "type": "text",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "rating",
+      "name": "Rating",
+      "type": "number",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "numberFormat": "plain"
+    },
+    {
+      "key": "date",
+      "name": "Date",
+      "type": "date",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "dateFormat": "relative"
+    },
+    {
+      "key": "generes",
+      "name": "Generes",
+      "type": "multi-tag",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "status",
+      "name": "Status",
+      "type": "status",
+      "width": 160,
+      "visible": true,
+      "wrap": false
+    },
+    {
+      "key": "test",
+      "name": "Test",
+      "type": "date",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "dateFormat": "relative"
+    }
+  ],
+  "sort": [],
+  "filters": [],
+  "tagColors": {},
+  "statusOptions": {},
+  "settings": {
+    "wrapCells": false,
+    "rowDensity": "compact",
+    "showRowNumbers": true
+  }
+}

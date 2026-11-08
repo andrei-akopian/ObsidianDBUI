@@ -4,20 +4,19 @@
     "type": "split",
     "children": [
       {
-        "id": "146c273807411f84",
+        "id": "69fa4d8fb1c3bfc6",
         "type": "tabs",
         "children": [
           {
-            "id": "b86bbb64e9e5fc0e",
+            "id": "4e27d7a69dcdd49f",
             "type": "leaf",
             "state": {
-              "type": "bases",
+              "type": "dbui-view",
               "state": {
-                "file": "Untitled 1.base",
-                "viewName": "View"
+                "file": "ReadingList.dbui"
               },
-              "icon": "lucide-table",
-              "title": "Untitled 1"
+              "icon": "lucide-file",
+              "title": "ReadingList"
             }
           }
         ]
@@ -175,21 +174,27 @@
   },
   "left-ribbon": {
     "hiddenItems": {
-      "obisidian-dataloom:Create loom": false,
       "switcher:Open quick switcher": false,
       "graph:Open graph view": false,
       "canvas:Create new canvas": false,
       "daily-notes:Open today's daily note": false,
       "templates:Insert template": false,
       "command-palette:Open command palette": false,
-      "bases:Create new base": false
+      "bases:Create new base": false,
+      "obisidian-dataloom:Create loom": false,
+      "obsidian-db-ui:New Database Table": false
     }
   },
-  "active": "b86bbb64e9e5fc0e",
+  "active": "4e27d7a69dcdd49f",
   "lastOpenFiles": [
-    "ReadingList/Example Book.md",
-    "Untitled.loom",
+    "Database.dbui",
+    "ReadingList.dbui",
+    "ReadingList Embed Demo.md",
     "Untitled 1.base",
+    "ReadingList/The Hobbit.md",
+    "ReadingList/Example Book.md",
+    "ReadingList/Dune.md",
+    "Untitled.loom",
     "Untitled.base",
     "ReadingList",
     "Welcome.md"
