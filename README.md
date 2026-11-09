@@ -1,4 +1,6 @@
-# # Obsidian DB UI Plugin
+# Obsidian DB UI Plugin
+
+[(this) GitHub Repository](https://github.com/andrei-akopian/ObsidianDBUI) | [MIT License](./License.md)
 
 This is a plugin for giving obsidian "bases" (databases) a good UI, similar to notion. Author believes this plugin has a more refined UI than similar plugins such as DataLoop, or GoodBases, or Notion Bases plugins.
 
@@ -6,30 +8,18 @@ This is a plugin for giving obsidian "bases" (databases) a good UI, similar to n
 >
 > Code is LLM written. The author has used it for less than **1** days. His use case is managing his ~1000 book reading list. Functionality outside this range might be poor.
 
+![](./assets/screenshots/database.png)
+
 ## Roadmap
 
-- [ ] Create a system for type cross converstion.
+- [ ] Create a system for type cross conversation.
 - [ ] More sophisticated source selection via regex or wildcard matching.
-- [ ] ability to edit filename when creating a new note.
+- [ ] better "Untitled" filename editing, and templates for new notes.
 
 ---
-
-## ✨ Features
-
-- **Folder-based Databases:** Point a database view to any vault folder (with optional recursive subfolder scanning).
-- **Rich Datatypes:**
-  - **Status:** Mutually exclusive dropdown with automated tag scanning across all entries, drag-and-drop pipeline ordering, and customizable color swatches.
-  - **Number:** Plain numbers, visual progress bars, or progress circles with configurable maximums.
-  - **Tag & Multi-Tag:** Single tag and multi-tag chip lists with fuzzy search tag pickers and palette colors.
-  - **Date & Datetime:** Relative format ("Today", "In 3 days", "2 weeks ago"), absolute ISO format (`YYYY-MM-DD` / `YYYY-MM-DDTHH:mm`), or combined views with an interactive calendar picker.
-  - **Checkbox:** Instant toggle with strict boolean coercion (`true`/`false`).
-  - **Note Title (File):** Direct note opening, split/tab opening, safe renaming with illegal character validation, and word-wrapping for long titles.
-- **Mouse Column Resizing:** Hover over the boundary between headers to drag and resize columns with pointer capture; widths are preserved in the configuration.
-- **Word Wrap:** Per-column wrap toggles or global view wrap settings.
-- **High Performance (1,000+ Notes):** Built-in chunked progressive rendering renders initial batches instantly and streams remaining rows as you scroll, ensuring drag-and-drop column reordering and filtering remain smooth and responsive.
-- **Embedded Markdown Code Blocks:** Embed live tables in any note using ```` ```dbui ```` code blocks with inline configuration or by referencing a `.dbui` file.
-
 ---
+
+## LLM Generated Docs 
 
 ## 🛠️ Building From Source
 
@@ -128,7 +118,3 @@ folder: "Books"
 includeSubfolders: true
 ```
 ````
-
----
-
-## 📄 License
