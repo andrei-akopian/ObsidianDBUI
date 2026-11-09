@@ -1,4 +1,5 @@
 {
+  "version": 1,
   "folder": "ReadingList",
   "includeSubfolders": true,
   "columns": [
@@ -8,7 +9,10 @@
       "type": "file",
       "width": 188,
       "visible": true,
-      "wrap": true
+      "wrap": true,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     },
     {
       "key": "author",
@@ -16,7 +20,10 @@
       "type": "text",
       "width": 124,
       "visible": true,
-      "wrap": false
+      "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     },
     {
       "key": "status",
@@ -25,6 +32,9 @@
       "width": 74,
       "visible": true,
       "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative",
       "options": [
         {
           "id": "reading",
@@ -51,7 +61,8 @@
       "visible": true,
       "wrap": false,
       "numberFormat": "progress-bar",
-      "numberMax": 5
+      "numberMax": 5,
+      "dateFormat": "relative"
     },
     {
       "key": "generes",
@@ -59,23 +70,9 @@
       "type": "multi-tag",
       "width": 200,
       "visible": true,
-      "wrap": false
-    },
-    {
-      "key": "test",
-      "name": "test",
-      "type": "text",
-      "width": 160,
-      "visible": true,
-      "wrap": false
-    },
-    {
-      "key": "date",
-      "name": "Date",
-      "type": "date",
-      "width": 160,
-      "visible": true,
       "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
       "dateFormat": "relative"
     },
     {
@@ -84,7 +81,21 @@
       "type": "text",
       "width": 160,
       "visible": true,
-      "wrap": false
+      "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
+    },
+    {
+      "key": "date",
+      "name": "Date",
+      "type": "date",
+      "width": 160,
+      "visible": true,
+      "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     },
     {
       "key": "test2",
@@ -92,7 +103,10 @@
       "type": "text",
       "width": 160,
       "visible": true,
-      "wrap": false
+      "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     },
     {
       "key": "test3",
@@ -100,7 +114,10 @@
       "type": "text",
       "width": 160,
       "visible": true,
-      "wrap": false
+      "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     },
     {
       "key": "hello",
@@ -108,7 +125,10 @@
       "type": "text",
       "width": 160,
       "visible": true,
-      "wrap": false
+      "wrap": false,
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     },
     {
       "key": "t",
@@ -117,7 +137,9 @@
       "width": 160,
       "visible": true,
       "wrap": false,
-      "numberFormat": "plain"
+      "numberFormat": "plain",
+      "numberMax": 100,
+      "dateFormat": "relative"
     }
   ],
   "sort": [],
@@ -151,5 +173,6 @@
     "wrapCells": false,
     "rowDensity": "comfortable",
     "showRowNumbers": true
-  }
+  },
+  "removedKeys": []
 }

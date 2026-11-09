@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "a0b670d883332085",
+        "id": "d21a9358c5ba0441",
         "type": "tabs",
         "children": [
           {
-            "id": "aa9b704dc0c6db4f",
+            "id": "63598fc2fb15657b",
             "type": "leaf",
             "state": {
               "type": "dbui-view",
@@ -185,15 +185,15 @@
       "obisidian-dataloom:Create loom": false
     }
   },
-  "active": "aa9b704dc0c6db4f",
+  "active": "63598fc2fb15657b",
   "lastOpenFiles": [
+    "ReadingList/Untitled 3 asdfghjkklasdfghjkklasdfghjkklasdfghjkkl.md",
+    "ReadingList.dbui",
     "Database.dbui",
     "ReadingList/The Hobbit.md",
-    "ReadingList.dbui",
     "ReadingList/Untitled.md",
     "ReadingList/Dune.md",
     "ReadingList/Untitled 2.md",
-    "ReadingList/Untitled 3.md",
     "ReadingList Embed Demo.md",
     "ReadingList/Untitled 1.md",
     "Untitled 1.base",

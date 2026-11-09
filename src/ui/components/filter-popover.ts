@@ -1,4 +1,5 @@
-import { ColumnConfig, DataType, DBConfig, FilterOperator, FilterRule, StatusOption } from "../../types";
+import { getRowValue } from "../../data/value-processor";
+import { ColumnConfig, DataType, DBConfig, FilterOperator, FilterRule, RowData, StatusOption } from "../../types";
 import { PopoverManager } from "../popover-manager";
 
 export class FilterPopover {
@@ -6,6 +7,7 @@ export class FilterPopover {
     anchor: HTMLElement,
     config: DBConfig,
     columns: ColumnConfig[],
+    allRows: RowData[],
     onConfigChange: () => Promise<void>,
     onDataUpdated: () => void
   ): void {
@@ -177,8 +179,25 @@ export class FilterPopover {
             const statusSelect = row.createEl("select", {
               cls: "dbui-select dbui-filter-val-input",
             });
-            const options: StatusOption[] =
-              (config.statusOptions && config.statusOptions[currentCol.key]) || currentCol.options || [];
+            const options: StatusOption[] = [
+              ...((config.statusOptions && config.statusOptions[currentCol.key]) || currentCol.options || [])
+            ];
+
+            if (allRows) {
+              for (const r of allRows) {
+                const val = getRowValue(r.values, currentCol.key);
+                if (val !== null && val !== undefined && val !== "") {
+                  const label = String(val).trim();
+                  if (label && !options.some((o) => o.label.toLowerCase() === label.toLowerCase())) {
+                    options.push({
+                      id: `scanned-${label.toLowerCase()}`,
+                      label,
+                      color: "",
+                    });
+                  }
+                }
+              }
+            }
 
             statusSelect.createEl("option", { value: "", text: "-- Select status --" });
             for (const opt of options) {

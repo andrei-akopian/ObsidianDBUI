@@ -1,34 +1,134 @@
-# Obsidian DB UI Plugin
+# # Obsidian DB UI Plugin
 
 This is a plugin for giving obsidian "bases" (databases) a good UI, similar to notion. Author believes this plugin has a more refined UI than similar plugins such as DataLoop, or GoodBases, or Notion Bases plugins.
 
 > [!WARNING]
 >
-> Code is LLM written. The author has used it for less than \*\*1\*\* days. His use case is managing his ~1000 book reading list. Functionality outside this range might be poor.
+> Code is LLM written. The author has used it for less than **1** days. His use case is managing his ~1000 book reading list. Functionality outside this range might be poor.
+
+## Roadmap
+
+- [ ] Create a system for type cross converstion.
+- [ ] More sophisticated source selection via regex or wildcard matching.
+- [ ] ability to edit filename when creating a new note.
 
 ---
 
-The goal of this project is to create an obsidian base view with extremely good UI.
+## ✨ Features
 
-A number of similar plugins exist (e.g. DataLoom) as well as Obsidian's default "base" view, and are installed in the \`Test\` vault, but lack various types of functionalities.
+- **Folder-based Databases:** Point a database view to any vault folder (with optional recursive subfolder scanning).
+- **Rich Datatypes:**
+  - **Status:** Mutually exclusive dropdown with automated tag scanning across all entries, drag-and-drop pipeline ordering, and customizable color swatches.
+  - **Number:** Plain numbers, visual progress bars, or progress circles with configurable maximums.
+  - **Tag & Multi-Tag:** Single tag and multi-tag chip lists with fuzzy search tag pickers and palette colors.
+  - **Date & Datetime:** Relative format ("Today", "In 3 days", "2 weeks ago"), absolute ISO format (`YYYY-MM-DD` / `YYYY-MM-DDTHH:mm`), or combined views with an interactive calendar picker.
+  - **Checkbox:** Instant toggle with strict boolean coercion (`true`/`false`).
+  - **Note Title (File):** Direct note opening, split/tab opening, safe renaming with illegal character validation, and word-wrapping for long titles.
+- **Mouse Column Resizing:** Hover over the boundary between headers to drag and resize columns with pointer capture; widths are preserved in the configuration.
+- **Word Wrap:** Per-column wrap toggles or global view wrap settings.
+- **High Performance (1,000+ Notes):** Built-in chunked progressive rendering renders initial batches instantly and streams remaining rows as you scroll, ensuring drag-and-drop column reordering and filtering remain smooth and responsive.
+- **Embedded Markdown Code Blocks:** Embed live tables in any note using ```` ```dbui ```` code blocks with inline configuration or by referencing a `.dbui` file.
 
-Desired featureset:
+---
 
-- source of database is frontmatter of all documents in a folder.
-  - the source selection should have dropdowns as in native obsidian base view, which help select the folder, without needing the user to correctly type a path over (as in DataLoom).
-- coloring of list (tag) entries
-- datatypes (backward compatible with frontmatter types, and infered unless the user sets it): 
-  - "status" which is a mutually exclusive dropdown
-  - "number" with progress bar, progress circle, (or just plain number) options
-  - "tag" (list) or actual obsidian tags
-    - suggestion of old tags, and creation of new tags via search. Assume that tag selection will be huge
-  - "multi-tag" (list)
-  - "dates" and "times" with options to display as relative to today, or future. And nice calendar select widgets.
-- wordwrap or overflow toggle where relevant
-- minimalist. Keep margins and padding in UI to minimum
-- standard featuers such as dragging and resizing columns on UI, editing column names, editing the original file by clicking on a cell and editing the property, etc. etc. filtering, sorting, selecting which columns to display and in which format, etc.
-- not sure how to store the configuration options
+## 🛠️ Building From Source
 
-## TODO
+### Prerequisites
+- [Node.js](https://nodejs.org/) (version 18 or higher recommended; Node 20+ tested)
+- npm (bundled with Node.js)
 
-- \[ \] integrate a mass processing system for changing types, renaming properties, and renaming tags
+### Build Steps
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/Andrei08/ObsidianDBUI.git
+   cd ObsidianDBUI
+   ```
+
+2. **Install dependencies:**
+   ```bash
+   npm install
+   ```
+
+3. **Run unit tests:**
+   ```bash
+   npm test
+   ```
+
+4. **Build the production bundle:**
+   ```bash
+   npm run build
+   ```
+
+   This executes TypeScript type checking (`tsc --noEmit`) and bundles the plugin using `esbuild`. The compiled bundle is output to `main.js`.
+
+---
+
+## 📥 Importing into Other Obsidian Vaults
+
+To install DB UI into any Obsidian vault:
+
+### Step 1: Locate Your Vault's Plugin Directory
+Each Obsidian vault stores its community plugins in a hidden `.obsidian/plugins/` directory:
+- **macOS:** `/Users/<username>/path/to/YourVault/.obsidian/plugins/`
+- **Windows:** `C:\Users\<username>\path\to\YourVault\.obsidian\plugins\`
+- **Linux:** `/home/<username>/path/to/YourVault/.obsidian/plugins/`
+
+> **Note:** If hidden folders are hidden in your OS file manager:
+> - On macOS, press `Cmd + Shift + .` in Finder to toggle hidden files.
+> - On Windows, enable "Hidden items" under the View tab in File Explorer.
+
+### Step 2: Create the Plugin Folder
+Inside `.obsidian/plugins/`, create a new folder named `obsidian-db-ui`:
+```bash
+mkdir -p "/path/to/YourVault/.obsidian/plugins/obsidian-db-ui"
+```
+
+### Step 3: Copy the Distribution Files
+Copy the following three files from the build into the new `obsidian-db-ui` folder:
+1. `main.js` (generated by `npm run build`)
+2. `manifest.json`
+3. `styles.css`
+
+Example command on macOS / Linux:
+```bash
+cp main.js manifest.json styles.css "/path/to/YourVault/.obsidian/plugins/obsidian-db-ui/"
+```
+
+### Step 4: Enable the Plugin in Obsidian
+1. Open Obsidian and open your target vault.
+2. Go to **Settings** (`Cmd + ,` or `Ctrl + ,`) -> **Community plugins**.
+3. If "Restricted mode" is on, turn it off to enable community plugins.
+4. Under "Installed plugins", click the **Check for updates / Reload plugins** button.
+5. Find **DB UI** in the list and toggle the switch to **On**.
+
+---
+
+## 🚀 Usage
+
+### 1. Dedicated `.dbui` File
+- Click the **DB UI** table icon in the left ribbon bar, or run the command `DB UI: Create new database table` from the Command Palette (`Cmd/Ctrl + P`).
+- Right-click any folder in your file explorer and choose **"New Database Table in this folder"**.
+- A `.dbui` file will be created and opened in Obsidian. Select your target source folder from the top toolbar dropdown.
+
+### 2. Embedded Tables in Notes
+Embed a database table directly into any Markdown note using the ````dbui```` code block:
+
+**Reference an existing `.dbui` file:**
+````markdown
+```dbui
+file: "Databases/ReadingList.dbui"
+```
+````
+
+**Inline configuration:**
+````markdown
+```dbui
+folder: "Books"
+includeSubfolders: true
+```
+````
+
+---
+
+## 📄 License

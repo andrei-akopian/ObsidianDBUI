@@ -182,6 +182,7 @@ export class DBTableView {
     if (this.debouncedRefresh) {
       this.debouncedRefresh.cancel();
     }
+    TableBody.cleanup();
     PopoverManager.closeAll(this.rootEl);
     for (const ref of this.eventRefs) {
       this.app.metadataCache.offref(ref);
@@ -252,6 +253,7 @@ export class DBTableView {
       this.config,
       this.discoveredProps,
       this.quickSearch,
+      this.rawRows,
       (query) => {
         this.quickSearch = query;
         this.filterAndSortRows();
@@ -383,6 +385,7 @@ export class DBTableView {
       this.app,
       this.frontmatterManager,
       this.allVaultTags,
+      this.tableContainerEl,
       async () => {
         await this.handleCreateNewNote();
       },

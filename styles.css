@@ -406,20 +406,36 @@
 }
 
 /* Resizer handle on th */
-.dbui-col-resizer {
+.dbui-col-resizer,
+.dbui-th-resizer {
   position: absolute;
   top: 0;
-  right: -2px;
-  width: var(--dbui-resizer-width);
+  right: -5px;
+  width: 10px;
   height: 100%;
   cursor: col-resize;
   z-index: 10;
   user-select: none;
+  touch-action: none;
 }
 
-.dbui-col-resizer:hover,
-body.is-resizing-column .dbui-col-resizer {
-  background-color: var(--dbui-resizer-hover-color);
+.dbui-col-resizer::after,
+.dbui-th-resizer::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 4px;
+  width: 2px;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.dbui-col-resizer:hover::after,
+.dbui-th-resizer:hover::after,
+body.is-resizing-column .dbui-col-resizer::after,
+body.is-resizing-column .dbui-th-resizer::after {
+  background-color: var(--interactive-accent);
 }
 
 body.is-resizing-column {
@@ -463,6 +479,13 @@ body.is-resizing-column {
   white-space: normal !important;
   word-break: break-word;
   overflow: visible;
+  height: auto !important;
+  min-height: var(--dbui-row-height-comfortable);
+}
+
+.dbui-root.is-compact .dbui-td.is-wrapped,
+.dbui-root.is-compact.is-wrap-cells .dbui-td {
+  min-height: var(--dbui-row-height-compact);
 }
 
 .dbui-td-index {
@@ -589,10 +612,11 @@ body.is-resizing-column {
 
 /* File cell */
 .dbui-file-cell {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
   width: 100%;
+  min-width: 0;
   overflow: hidden;
 }
 
@@ -615,11 +639,28 @@ body.is-resizing-column {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .dbui-file-name:hover {
   text-decoration: underline;
   color: var(--interactive-accent);
+}
+
+/* File cell wrap support */
+.dbui-root.is-wrap-cells .dbui-file-cell,
+.dbui-td.is-wrapped .dbui-file-cell {
+  align-items: flex-start;
+  white-space: normal;
+}
+
+.dbui-root.is-wrap-cells .dbui-file-name,
+.dbui-td.is-wrapped .dbui-file-name {
+  white-space: normal !important;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  text-overflow: clip;
 }
 
 /* Checkbox cell */

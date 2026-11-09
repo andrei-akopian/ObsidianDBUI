@@ -48,6 +48,20 @@ export class ConfirmDeleteModal extends Modal {
 }
 
 export class TableBody {
+  private static observer: IntersectionObserver | null = null;
+  private static scrollCleanup: (() => void) | null = null;
+
+  static cleanup(): void {
+    if (this.observer) {
+      this.observer.disconnect();
+      this.observer = null;
+    }
+    if (this.scrollCleanup) {
+      this.scrollCleanup();
+      this.scrollCleanup = null;
+    }
+  }
+
   static render(
     tbody: HTMLTableSectionElement,
     rows: RowData[],
@@ -56,17 +70,22 @@ export class TableBody {
     app: App,
     frontmatterManager: FrontmatterManager,
     allVaultTags: string[],
+    tableContainerEl?: HTMLElement,
     onNewNote?: () => Promise<void>,
     onConfigChange?: () => Promise<void>,
     onDataUpdated?: () => void
   ): void {
+    this.cleanup();
     tbody.empty();
 
     if (rows.length === 0) {
       return;
     }
 
-    rows.forEach((row, rowIndex) => {
+    const CHUNK_SIZE = 50;
+    let renderedCount = 0;
+
+    const renderRow = (row: RowData, rowIndex: number): HTMLTableRowElement => {
       const tr = tbody.createEl("tr", { cls: "dbui-row" });
       tr.setAttribute("data-path", row.path);
 
@@ -75,7 +94,6 @@ export class TableBody {
         const tdIndex = tr.createEl("td", { cls: "dbui-td dbui-td-index" });
         tdIndex.createSpan({ text: String(rowIndex + 1) });
 
-        // Context menu on index cell or row right click
         tdIndex.addEventListener("contextmenu", (evt) => {
           evt.preventDefault();
           this.showRowContextMenu(evt, row, app, frontmatterManager, onNewNote, onDataUpdated);
@@ -83,7 +101,6 @@ export class TableBody {
       }
 
       tr.addEventListener("contextmenu", (evt) => {
-        // Only trigger if not already handling input
         if ((evt.target as HTMLElement).tagName === "INPUT") return;
         evt.preventDefault();
         this.showRowContextMenu(evt, row, app, frontmatterManager, onNewNote, onDataUpdated);
@@ -103,35 +120,110 @@ export class TableBody {
           app,
           frontmatterManager,
           allVaultTags,
+          rows, // allRows
           onConfigChange || (async () => {}),
           onDataUpdated || (() => {})
         );
       });
 
-      // Trailing empty cell under "+ Add property" sticky header
+      // Trailing empty spacer cell
       tr.createEl("td", { cls: "dbui-td dbui-td-spacer" });
-    });
+      return tr;
+    };
 
-    // Bottom "+ New note" row button spanning full table width
-    const trNew = tbody.createEl("tr", { cls: "dbui-row dbui-row-new" });
+    const appendNewNoteRow = () => {
+      const trNew = tbody.createEl("tr", { cls: "dbui-row dbui-row-new" });
+      const totalCols = columns.length + (config.settings.showRowNumbers ? 1 : 0) + 1;
+
+      const tdNewAction = trNew.createEl("td", {
+        cls: "dbui-td dbui-td-new-action",
+        attr: { colspan: String(totalCols) },
+      });
+      tdNewAction.colSpan = totalCols;
+
+      const newBtn = tdNewAction.createDiv({ cls: "dbui-new-row-btn" });
+      const plusIcon = newBtn.createSpan({ cls: "dbui-new-row-plus" });
+      setIcon(plusIcon, "plus");
+      newBtn.createSpan({ text: "New note" });
+
+      trNew.addEventListener("click", async () => {
+        if (onNewNote) {
+          await onNewNote();
+        }
+      });
+    };
+
+    // Render initial chunk
+    const initialLimit = Math.min(CHUNK_SIZE, rows.length);
+    for (let i = 0; i < initialLimit; i++) {
+      renderRow(rows[i], i);
+    }
+    renderedCount = initialLimit;
+
+    if (renderedCount >= rows.length) {
+      appendNewNoteRow();
+      return;
+    }
+
+    // Create sentinel row for IntersectionObserver & progressive loading
+    const sentinelTr = tbody.createEl("tr", { cls: "dbui-chunk-sentinel" });
     const totalCols = columns.length + (config.settings.showRowNumbers ? 1 : 0) + 1;
-
-    const tdNewAction = trNew.createEl("td", {
-      cls: "dbui-td dbui-td-new-action",
+    const sentinelTd = sentinelTr.createEl("td", {
       attr: { colspan: String(totalCols) },
     });
-    tdNewAction.colSpan = totalCols;
+    sentinelTd.colSpan = totalCols;
+    sentinelTd.style.height = "1px";
+    sentinelTd.style.padding = "0";
+    sentinelTd.style.border = "none";
 
-    const newBtn = tdNewAction.createDiv({ cls: "dbui-new-row-btn" });
-    const plusIcon = newBtn.createSpan({ cls: "dbui-new-row-plus" });
-    setIcon(plusIcon, "plus");
-    newBtn.createSpan({ text: "New note" });
+    const loadNextChunk = () => {
+      if (renderedCount >= rows.length) return;
 
-    trNew.addEventListener("click", async () => {
-      if (onNewNote) {
-        await onNewNote();
+      const nextLimit = Math.min(renderedCount + CHUNK_SIZE, rows.length);
+      for (let i = renderedCount; i < nextLimit; i++) {
+        const rowEl = renderRow(rows[i], i);
+        tbody.insertBefore(rowEl, sentinelTr);
       }
-    });
+      renderedCount = nextLimit;
+
+      if (renderedCount >= rows.length) {
+        TableBody.cleanup();
+        sentinelTr.remove();
+        appendNewNoteRow();
+      }
+    };
+
+    // 1. IntersectionObserver with generous margin for seamless scroll
+    if (typeof IntersectionObserver !== "undefined") {
+      this.observer = new IntersectionObserver(
+        (entries) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            loadNextChunk();
+          }
+        },
+        {
+          root: tableContainerEl || null,
+          rootMargin: "300px 0px",
+        }
+      );
+      this.observer.observe(sentinelTr);
+    }
+
+    // 2. Scroll listener fallback on tableContainerEl
+    if (tableContainerEl) {
+      const onScroll = () => {
+        if (
+          tableContainerEl.scrollTop + tableContainerEl.clientHeight >=
+          tableContainerEl.scrollHeight - 400
+        ) {
+          loadNextChunk();
+        }
+      };
+      tableContainerEl.addEventListener("scroll", onScroll, { passive: true });
+      this.scrollCleanup = () => {
+        tableContainerEl.removeEventListener("scroll", onScroll);
+      };
+    }
   }
 
   private static showRowContextMenu(

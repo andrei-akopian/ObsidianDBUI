@@ -65,3 +65,18 @@ test("VaultScanner.discoverColumns respects removedKeys", () => {
   assert.ok(keys.includes("review"));
   assert.ok(!keys.includes("rating"), "Removed key 'rating' must not be auto-discovered again!");
 });
+
+test("VaultScanner.scanStatusOptions scans all unique status labels across entries", () => {
+  const scanner = new VaultScanner({} as any);
+  const rows: RowData[] = [
+    { file: {} as any, basename: "A", path: "A.md", values: { status: "To Read" } },
+    { file: {} as any, basename: "B", path: "B.md", values: { status: "Reading" } },
+    { file: {} as any, basename: "C", path: "C.md", values: { status: "Finished" } },
+    { file: {} as any, basename: "D", path: "D.md", values: { status: "Reading" } }, // Duplicate
+    { file: {} as any, basename: "E", path: "E.md", values: { status: "" } }, // Empty
+  ];
+
+  const options = scanner.scanStatusOptions(rows, "status");
+  const labels = options.map((o) => o.label);
+  assert.deepEqual(labels, ["Finished", "Reading", "To Read"]);
+});

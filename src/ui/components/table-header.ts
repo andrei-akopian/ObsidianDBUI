@@ -106,7 +106,7 @@ export class TableHeader {
       th.addEventListener("dragover", (evt) => {
         evt.preventDefault();
         if (evt.dataTransfer) evt.dataTransfer.dropEffect = "move";
-        if (draggedColKey && draggedColKey !== column.key) {
+        if (draggedColKey && draggedColKey !== column.key && !th.classList.contains("is-drag-over")) {
           th.addClass("is-drag-over");
         }
       });
@@ -133,7 +133,8 @@ export class TableHeader {
       });
 
       // Resize handle
-      const resizer = th.createDiv({ cls: "dbui-th-resizer" });
+      const resizer = th.createDiv({ cls: "dbui-col-resizer dbui-th-resizer" });
+      resizer.setAttribute("title", "Drag to resize column");
       this.attachResizer(resizer, th, column, onConfigChange);
     });
 

@@ -1,9 +1,9 @@
 import { App, TFile, TFolder } from "obsidian";
-import { ColumnConfig, DataType, RowData } from "../types";
+import { ColumnConfig, DataType, RowData, StatusOption } from "../types";
 import { parseDate } from "../utils/date-utils";
 import { normalizeTag } from "../utils/string-utils";
 import { FrontmatterManager } from "./frontmatter-manager";
-import { toNumeric } from "./value-processor";
+import { getRowValue, toNumeric } from "./value-processor";
 
 export interface DiscoveredProperty {
   key: string;
@@ -168,6 +168,7 @@ export class VaultScanner {
     for (const [lowerKey, entry] of keySamples.entries()) {
       if (!columnMap.has(lowerKey)) {
         const inferredType = this.inferMajorityType(entry.samples, entry.originalKey);
+        const options = inferredType === "status" ? this.scanStatusOptions(rows, entry.originalKey) : undefined;
         columnMap.set(lowerKey, {
           key: entry.originalKey,
           name: this.formatKeyToDisplayName(entry.originalKey),
@@ -177,6 +178,7 @@ export class VaultScanner {
           wrap: false,
           numberFormat: inferredType === "number" ? "plain" : undefined,
           dateFormat: inferredType === "date" ? "relative" : undefined,
+          options,
         });
       }
     }
@@ -201,6 +203,25 @@ export class VaultScanner {
     }
 
     return result;
+  }
+
+  /**
+   * Scan all unique status values for a column across all rows.
+   */
+  scanStatusOptions(rows: RowData[], colKey: string): StatusOption[] {
+    const set = new Set<string>();
+    for (const r of rows) {
+      const val = getRowValue(r.values, colKey);
+      if (val !== null && val !== undefined && val !== "") {
+        const s = String(val).trim();
+        if (s) set.add(s);
+      }
+    }
+    return Array.from(set).sort().map((label, idx) => ({
+      id: `status-${idx}`,
+      label,
+      color: "",
+    }));
   }
 
   /**

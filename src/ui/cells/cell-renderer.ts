@@ -18,6 +18,7 @@ export class CellRenderer {
     app: App,
     frontmatterManager: FrontmatterManager,
     allVaultTags: string[],
+    allRows: RowData[],
     onConfigChange: () => Promise<void>,
     onDataUpdated: () => void
   ): void {
@@ -70,6 +71,7 @@ export class CellRenderer {
           column,
           config.tagColors,
           config.statusOptions,
+          allRows,
           onCommit,
           async (options) => {
             if (!config.statusOptions) config.statusOptions = {};

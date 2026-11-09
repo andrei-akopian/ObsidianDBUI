@@ -1,6 +1,7 @@
 import { setIcon } from "obsidian";
 import { COLOR_PALETTE } from "../../constants";
 import { resolveTagColor } from "../../data/color-palette";
+import { getRowValue } from "../../data/value-processor";
 import { ColumnConfig, RowData, StatusOption, TagColor } from "../../types";
 import { PopoverManager } from "../popover-manager";
 
@@ -11,10 +12,11 @@ export class StatusCell {
     column: ColumnConfig,
     tagColors: Record<string, TagColor>,
     statusOptions: Record<string, StatusOption[]>,
+    allRows: RowData[],
     onCommit: (newValue: any) => Promise<void>,
     onSaveStatusOptions: (options: StatusOption[]) => Promise<void>
   ): void {
-    const rawVal = row.values[column.key];
+    const rawVal = getRowValue(row.values, column.key);
     const status = rawVal ? String(rawVal).trim() : "";
 
     container.empty();
@@ -32,7 +34,16 @@ export class StatusCell {
 
     container.addEventListener("click", (evt) => {
       evt.stopPropagation();
-      this.openStatusPopover(container, column, status, tagColors, statusOptions, onCommit, onSaveStatusOptions);
+      this.openStatusPopover(
+        container,
+        column,
+        status,
+        tagColors,
+        statusOptions,
+        allRows,
+        onCommit,
+        onSaveStatusOptions
+      );
     });
   }
 
@@ -42,14 +53,37 @@ export class StatusCell {
     initialStatus: string,
     tagColors: Record<string, TagColor>,
     statusOptionsMap: Record<string, StatusOption[]>,
+    allRows: RowData[],
     onCommit: (newValue: any) => Promise<void>,
     onSaveStatusOptions: (options: StatusOption[]) => Promise<void>
   ): void {
     let currentStatus = initialStatus;
-    const existingOptions: StatusOption[] = [...(statusOptionsMap[column.key] || column.options || [])];
+    const existingOptions: StatusOption[] = [
+      ...(statusOptionsMap[column.key] || column.options || []),
+    ];
 
-    // If note has an existing status value not in configured options, add it
-    if (initialStatus && !existingOptions.some((o) => o.label.toLowerCase() === initialStatus.toLowerCase())) {
+    // Scan all rows across the table for all unique status values in this column
+    if (allRows && allRows.length > 0) {
+      for (const r of allRows) {
+        const val = getRowValue(r.values, column.key);
+        if (val !== null && val !== undefined && val !== "") {
+          const label = String(val).trim();
+          if (label && !existingOptions.some((o) => o.label.toLowerCase() === label.toLowerCase())) {
+            existingOptions.push({
+              id: `scanned-${label.toLowerCase()}`,
+              label,
+              color: "",
+            });
+          }
+        }
+      }
+    }
+
+    // If note has an existing status value not yet added, add it
+    if (
+      initialStatus &&
+      !existingOptions.some((o) => o.label.toLowerCase() === initialStatus.toLowerCase())
+    ) {
       existingOptions.push({
         id: `existing-${Date.now()}`,
         label: initialStatus,
@@ -155,12 +189,9 @@ export class StatusCell {
 
         item.addEventListener("click", async (e) => {
           e.stopPropagation();
-          // Update visual checkmark immediately
           currentStatus = opt.label;
           renderList(searchInput.value);
-          // Close popover
           close();
-          // Commit property update
           await onCommit(opt.label);
         });
       }
@@ -169,33 +200,20 @@ export class StatusCell {
       if (q && !existingOptions.some((opt) => opt.label.toLowerCase() === q)) {
         const createItem = listContainer.createDiv({ cls: "dbui-popover-item dbui-create-item" });
         createItem.createSpan({ text: `+ Create "${filter.trim()}"` });
-        createItem.addEventListener("click", async (e) => {
-          e.stopPropagation();
+        createItem.addEventListener("click", async () => {
           const newLabel = filter.trim();
           const newOpt: StatusOption = {
-            id: newLabel.toLowerCase().replace(/\s+/g, "-"),
+            id: String(Date.now()),
             label: newLabel,
             color: "",
           };
-          const updated = [...existingOptions, newOpt];
-          statusOptionsMap[column.key] = updated;
-          await onSaveStatusOptions(updated);
+          existingOptions.push(newOpt);
+          statusOptionsMap[column.key] = [...existingOptions];
+          column.options = [...existingOptions];
+          await onSaveStatusOptions(existingOptions);
           currentStatus = newLabel;
-          renderList(searchInput.value);
           close();
           await onCommit(newLabel);
-        });
-      }
-
-      // Clear button
-      if (currentStatus) {
-        const clearItem = listContainer.createDiv({ cls: "dbui-popover-item dbui-clear-item" });
-        clearItem.createSpan({ text: "Clear status" });
-        clearItem.addEventListener("click", async (e) => {
-          e.stopPropagation();
-          currentStatus = "";
-          close();
-          await onCommit(null);
         });
       }
     };
@@ -211,63 +229,44 @@ export class StatusCell {
 
     searchInput.addEventListener("keydown", async (evt) => {
       if (evt.key === "Enter") {
-        const q = searchInput.value.trim();
-        if (!q) return;
-        const exact = existingOptions.find((opt) => opt.label.toLowerCase() === q.toLowerCase());
-        if (exact) {
-          currentStatus = exact.label;
-          close();
-          await onCommit(exact.label);
-        } else {
-          const newOpt: StatusOption = {
-            id: q.toLowerCase().replace(/\s+/g, "-"),
-            label: q,
-            color: "",
-          };
-          const updated = [...existingOptions, newOpt];
-          statusOptionsMap[column.key] = updated;
-          await onSaveStatusOptions(updated);
-          currentStatus = q;
-          close();
-          await onCommit(q);
-        }
+        const first = listContainer.querySelector(".dbui-popover-item") as HTMLElement;
+        if (first) first.click();
       }
     });
   }
 
   static openColorMenu(
     anchor: HTMLElement,
-    label: string,
+    statusLabel: string,
     tagColors: Record<string, TagColor>,
-    onSelectColor: (color: TagColor) => Promise<void>
+    onSelect: (color: TagColor) => Promise<void>
   ): void {
-    const { el: colorMenu, close, reposition } = PopoverManager.createPopover({
+    const { el: popover, close } = PopoverManager.createPopover({
       anchor,
       cls: "dbui-color-picker-popover",
       allowNested: true,
-      offset: 6,
     });
 
+    popover.createDiv({ cls: "dbui-color-picker-title", text: `Color for "${statusLabel}"` });
+    const grid = popover.createDiv({ cls: "dbui-color-grid" });
+
     const isDark = document.body.classList.contains("theme-dark");
-    const grid = colorMenu.createDiv({ cls: "dbui-color-grid" });
 
     for (const preset of COLOR_PALETTE) {
+      const item = grid.createDiv({ cls: "dbui-color-item" });
       const bg = isDark ? preset.bgDark : preset.bgLight;
       const text = isDark ? preset.textDark : preset.textLight;
 
-      const cell = grid.createDiv({
-        cls: "dbui-color-swatch-cell",
-        attr: { title: preset.name },
-      });
-      cell.style.backgroundColor = text;
+      const swatch = item.createDiv({ cls: "dbui-color-swatch" });
+      swatch.style.backgroundColor = bg;
+      swatch.style.color = text;
+      swatch.createSpan({ text: preset.name });
 
-      cell.addEventListener("click", async (e) => {
+      item.addEventListener("click", async (e) => {
         e.stopPropagation();
         close();
-        await onSelectColor({ bg, text });
+        await onSelect({ bg, text });
       });
     }
-
-    reposition();
   }
 }

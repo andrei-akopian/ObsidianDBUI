@@ -1,6 +1,6 @@
 import { App, setIcon } from "obsidian";
 import { DiscoveredProperty } from "../../data/vault-scanner";
-import { DBConfig } from "../../types";
+import { DBConfig, RowData } from "../../types";
 import { ColumnsPopover } from "./columns-popover";
 import { FilterPopover } from "./filter-popover";
 import { FolderSuggestModal } from "./folder-suggest-modal";
@@ -23,6 +23,7 @@ export class TableToolbar {
     config: DBConfig,
     discoveredProps: DiscoveredProperty[],
     quickSearch: string,
+    allRows: RowData[],
     onSearch: (query: string) => void,
     onFolderSelect: (folderPath: string) => Promise<void>,
     onNewNote: () => Promise<void>,
@@ -119,6 +120,7 @@ export class TableToolbar {
         filterBtn,
         config,
         config.columns,
+        allRows,
         onConfigChange,
         onDataUpdated
       );
