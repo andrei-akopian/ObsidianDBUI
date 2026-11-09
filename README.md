@@ -2,7 +2,7 @@
 
 [(this) GitHub Repository](https://github.com/andrei-akopian/ObsidianDBUI) | [MIT License](./License.md)
 
-This is a plugin for giving \[Obsidian\]([https://obsidian.md/](https://obsidian.md/)) "bases" (databases) a good UI, similar to notion. Author believes this plugin has a more refined UI than similar plugins such as \[DataLoom\]([https://community.obsidian.md/plugins/obisidian-dataloom](https://community.obsidian.md/plugins/obisidian-dataloom)), or \[GoodBases\]([https://community.obsidian.md/plugins/good-bases](https://community.obsidian.md/plugins/good-bases)), or Notion Bases plugins. 
+This is a plugin for giving [Obsidian](https://obsidian.md/) "bases" (databases) a good UI, similar to notion. Author believes this plugin has a more refined UI than similar plugins such as [DataLoom](https://community.obsidian.md/plugins/obisidian-dataloom), or [GoodBases](https://community.obsidian.md/plugins/good-bases), or Notion Bases plugins. 
 
 > [!WARNING]
 >
